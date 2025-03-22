@@ -1,6 +1,6 @@
 from typing import List
 from typing import Optional
-from sqlalchemy import ForeignKey, Boolean, Integer
+from sqlalchemy import ForeignKey, Boolean, Integer, Float
 from sqlalchemy import String
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import Mapped
@@ -16,6 +16,8 @@ class Workspace(Base):
     description: Mapped[Optional[str]] = mapped_column(String(1000),nullable=True)
     owner_name: Mapped[str] = mapped_column(ForeignKey("users.username"))
     owner: Mapped["User"] = relationship(back_populates="workspace")
+    progress: Mapped[float] = mapped_column(Float)
+    task_lists: Mapped[List["TaskList"]] = relationship("TaskList", back_populates="workspace", cascade="all, delete-orphan")
     def __repr__(self) -> str:
         return f"Item(Name={self.name!r}, Owner={self.owner_name!r}, Description={self.description!r})"
 
@@ -40,4 +42,23 @@ class UserState(Base):
     state: Mapped[Optional[str]] = mapped_column(String(50), default=None, nullable=True)
     user: Mapped["User"] = relationship(User, back_populates="user_state")
     def __repr__(self) -> str:
-        return f"Username(id={self.telegram_username!r}, State={self.state!r})"
+        return f"UserState(id={self.telegram_username!r}, State={self.state!r})"
+
+class TaskList(Base):
+    __tablename__ = "lists"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace: Mapped["Workspace"] = relationship(back_populates="task_lists")
+    workspace_name: Mapped[str] = mapped_column(ForeignKey("workspaces.name"))
+    name: Mapped[str] = mapped_column(String(100), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(String(5000), nullable=True)
+    completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    weight: Mapped[float] = mapped_column(Float)
+    def __repr__(self) -> str:
+        return (f"TaskList(id={self.id!r}, Workspace_name={self.workspace_name!r}, Name={self.name!r}, "
+                f"Description={self.description!r}, Completed={self.completed!r}, Weight={self.weight!r})")
+
+class Task(Base):
+    __tablename__ = "tasks"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    list_id: Mapped[int] = mapped_column(ForeignKey("lists.id"))
+    list:Mapped["TaskList"] = relationship()
