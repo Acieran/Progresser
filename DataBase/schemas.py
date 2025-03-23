@@ -51,7 +51,7 @@ class TaskList(Base):
     workspace_name: Mapped[str] = mapped_column(ForeignKey("workspaces.name"))
     name: Mapped[str] = mapped_column(String(100), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(String(5000), nullable=True)
-    completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    progress: Mapped[float] = mapped_column(Float)
     weight: Mapped[float] = mapped_column(Float)
     tasks: Mapped[List["Task"]] = relationship(back_populates="list", cascade="all, delete-orphan")
     def __repr__(self) -> str:
