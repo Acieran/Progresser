@@ -39,9 +39,10 @@ def test_validate_task_invalid_weight(bot):
     message_text = "Имя - My Task\nlist_name - 123\nВес - 150"  # Weight > 100
     message_mock = create_message_mock(message_text)
 
-    with bot.validate_message(message_mock, Task) as excinfo: # Expect ValidationError to be raised
-        assert excinfo.__class__ == ValidationError
-        assert "100" in str(excinfo.value) # Check weight constraint mentioned
+    with pytest.raises(ValidationError) as excinfo:
+        bot.validate_message(message_mock, Task)
+
+    assert "100" in str(excinfo.value) # Check weight constraint mentioned
 
 def test_validate_message_parse_error(bot):
     """Test when parse_message returns an error."""
@@ -54,7 +55,7 @@ def test_validate_message_parse_error(bot):
 
 def test_baseobject_name_too_long(bot):
     """Test validation failure due to name exceeding max length."""
-    message_text = "Имя - " + "A" * 31 + "\nОписание - This is description\nworkspace_name - Test Workspace"  # Name too long
+    message_text = "Имя - " + "A" * 101 + "\nОписание - This is description\nИмя Рабочего пространства - Test Workspace"  # Name too long
     message_mock = create_message_mock(message_text)
 
     with pytest.raises(ValidationError) as excinfo:

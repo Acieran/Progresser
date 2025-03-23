@@ -181,13 +181,15 @@ class Bot:
                 self.logger.error(f"Error validation message from user {message.chat.username}\n"
                                   f"Message - {parsed_dict}\n"
                                   f"Error - {e}")
-                return self.bot.send_message(message.chat.id, str(e))
+                raise e
         return validated_model
 
 
 
-    def process_something_with_state(self, message, **kwargs):
+    def process_something_with_state(self, message):
         chat_id = message.chat.id
+        username = message.chat.username
+        # cls_from_state_dict =
 
 
     def set_state(self, telegram_username, state):
