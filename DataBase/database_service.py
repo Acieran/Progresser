@@ -145,7 +145,6 @@ class DatabaseService:
             raise e
 
     def get_all(self, model:Type, session: Optional[Session] = None) -> Any:
-        """Creates a new record in the database."""
         own_session = False
         try:
             if session is None:
@@ -154,6 +153,24 @@ class DatabaseService:
 
             result = session.query(model).all()
             return result
+        except exc.SQLAlchemyError as e:
+            raise e
+        finally:
+            if own_session:
+                session.close()
+
+    def get_user_state(self, telegram_username: str, session: Optional[Session] = None) -> Any:
+        own_session = False
+        try:
+            if session is None:
+                session = self.SessionLocal()  # type: ignore
+                own_session = True
+
+            if result := self.get_by_id(UserState, telegram_username, session):
+                return result.state
+            else:
+                self.create(UserState, {'telegram_username': telegram_username})
+                return None
         except exc.SQLAlchemyError as e:
             raise e
         finally:

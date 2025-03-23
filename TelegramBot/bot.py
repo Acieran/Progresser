@@ -2,7 +2,6 @@ import os
 import logging
 import asyncio
 
-from aiohttp.web_fileresponse import content_type
 from sqlalchemy.exc import SQLAlchemyError
 from telebot import types
 
@@ -99,7 +98,6 @@ class Bot:
             username = message.chat.username
             db_user = self.database.get_by_custom_field(User, "telegram_username", username)
             if db_user:
-                # context.user_data["user_id"] = db_user.id
                 await self.bot.reply_to(message, f"Hello, {db_user.username}, how can I help you? \n"
                                                  "/view to view your workspaces \n"
                                                  "/create_workspace to create new workspace")
@@ -126,10 +124,13 @@ class Bot:
             self.logger.info(f"There is an unprocessed message: {message.text}\n Full message - {message}")
 
     def set_state(self, telegram_username, state):
-        self.database.update(UserState, telegram_username, {"state": state})
+        if not self.database.get_user_state(telegram_username):
+            self.database.update(UserState, telegram_username, {"state": state})
+        else:
+            raise
 
     def get_state(self, telegram_username):
-        return self.database.get_by_custom_field(UserState, "telegram_username", telegram_username).state
+        return self.database.get_user_state(telegram_username)
 
     def clear_state(self, telegram_username):
         if self.get_state(telegram_username):

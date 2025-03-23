@@ -53,6 +53,7 @@ class TaskList(Base):
     description: Mapped[Optional[str]] = mapped_column(String(5000), nullable=True)
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
     weight: Mapped[float] = mapped_column(Float)
+    tasks: Mapped[List["Task"]] = relationship(back_populates="list", cascade="all, delete-orphan")
     def __repr__(self) -> str:
         return (f"TaskList(id={self.id!r}, Workspace_name={self.workspace_name!r}, Name={self.name!r}, "
                 f"Description={self.description!r}, Completed={self.completed!r}, Weight={self.weight!r})")
@@ -61,4 +62,11 @@ class Task(Base):
     __tablename__ = "tasks"
     id: Mapped[int] = mapped_column(primary_key=True)
     list_id: Mapped[int] = mapped_column(ForeignKey("lists.id"))
-    list:Mapped["TaskList"] = relationship()
+    list:Mapped["TaskList"] = relationship(back_populates="tasks")
+    name: Mapped[str] = mapped_column(String(100))
+    description: Mapped[Optional[str]] = mapped_column(String(5000), nullable=True)
+    completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    weight: Mapped[float] = mapped_column(Float)
+    def __repr__(self) -> str:
+        return (f"TaskList(id={self.id!r}, List Id={self.list_id!r}, Name={self.name!r}, "
+                f"Description={self.description!r}, Completed={self.completed!r}, Weight={self.weight!r})")
