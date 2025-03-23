@@ -1,8 +1,10 @@
 import os
 import logging
 import asyncio
-from typing import Optional
+import re
+from typing import Optional, Dict, Any, Type
 
+from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from telebot import types
 
@@ -124,18 +126,69 @@ class Bot:
             self.logger.info(self.check_state_and_create(message.chat.username) == "creating workspace")
             self.logger.info(f"There is an unprocessed message: {message.text}\n Full message - {message}")
 
-    async def create_something_with_state(self, message, command_name, state_name,
+    def create_something_with_state(self, message, command_name, state_name,
                          object_name):
         username = message.chat.username
         try:
             self.logger.info(f"User {username} triggered {command_name}")
             self.set_state(username, state_name)
-            await self.bot.send_message(message.chat.id, f"What name would you like to give your {object_name}?")
+            return self.bot.send_message(message.chat.id, f"What name would you like to give your {object_name}?")
         except SQLAlchemyError as error:
             self.logger.error(
                 f"Error upon triggering {command_name} with username - {username}. \n Full message - {message}",
                 exc_info=True)
-            await self.bot.send_message(message.chat.id, "There was an error with your request")
+            return self.bot.send_message(message.chat.id, "There was an error with your request")
+
+    def parse_message(self, message) -> Dict[str, Any]:
+        text = message.text
+        result = {"error": None}
+        boolean_dict = {
+            "Да": True,
+            "Нет": False,
+            "1" : True,
+            "0" : False,
+            "Y" : True,
+            "N" : False,
+            "True": True,
+            "False" : False,
+        }
+        try:
+            lines = text.splitlines()
+
+            for line in lines:
+                match = re.match(r"^(.*?)\s*-\s*(.*)$", line)  # Captures before and after ' - '
+
+                if match:
+                    field = match.group(1).strip()
+                    value = match.group(2).strip()
+                    if field == "Завершено":
+                        value = boolean_dict[value]
+                    result[field] = str(value)
+        except Exception as e:
+            self.logger.error(f"Error parsing message - {e}\n Full message - {message}")
+            result['error'] = e
+        finally:
+            return result
+
+    def validate_message(self, message, cls: Type) -> Any:
+        parsed_dict = self.parse_message(message)
+        if parsed_dict['error']:
+            raise parsed_dict['error']
+        else:
+            try:
+                validated_model = cls(**parsed_dict)
+            except ValidationError as e:
+                self.logger.error(f"Error validation message from user {message.chat.username}\n"
+                                  f"Message - {parsed_dict}\n"
+                                  f"Error - {e}")
+                return self.bot.send_message(message.chat.id, str(e))
+        return validated_model
+
+
+
+    def process_something_with_state(self, message, **kwargs):
+        chat_id = message.chat.id
+
 
     def set_state(self, telegram_username, state):
         self.check_state_and_create(telegram_username)

@@ -12,7 +12,8 @@ class Base(DeclarativeBase):
 
 class Workspace(Base):
     __tablename__ = "workspaces"
-    name: Mapped[str] = mapped_column(String(30),primary_key=True)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(30))
     description: Mapped[Optional[str]] = mapped_column(String(1000),nullable=True)
     owner_name: Mapped[str] = mapped_column(ForeignKey("users.username"))
     owner: Mapped["User"] = relationship(back_populates="workspace")
@@ -54,6 +55,7 @@ class TaskList(Base):
     progress: Mapped[float] = mapped_column(Float)
     weight: Mapped[float] = mapped_column(Float)
     tasks: Mapped[List["Task"]] = relationship(back_populates="list", cascade="all, delete-orphan")
+    user: Mapped["User"] = relationship(User)
     def __repr__(self) -> str:
         return (f"TaskList(id={self.id!r}, Workspace_name={self.workspace_name!r}, Name={self.name!r}, "
                 f"Description={self.description!r}, Completed={self.completed!r}, Weight={self.weight!r})")
