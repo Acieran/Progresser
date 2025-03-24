@@ -12,7 +12,10 @@ from dotenv import load_dotenv
 from telebot.async_telebot import AsyncTeleBot
 
 from DataBase.database_service import DatabaseService
-from DataBase.schemas import User, Workspace, UserState
+from DataBase.schemas import User as BDUser, Workspace as BDWorkspace, UserState as BDUserState, Task as BDTask, \
+    TaskList as BDTaskList
+from resources.pydantic_classes import TaskList, Task
+from resources.statics import Messages
 
 # --- Configuration ---
 logging.basicConfig(
@@ -23,10 +26,16 @@ logging.basicConfig(
     encoding='utf-8'
 )
 
+
 class Bot:
     def __init__(self, token):
+        self.CLASS_FROM_STATE = {
+            "/create_TaskList": (TaskList, BDTaskList),
+            "/create_Task": (Task, BDTask)
+        }
         self.bot = AsyncTeleBot(token=token)
-        self.logger = logging.getLogger(__name__) # Logger for Bot
+        self.cached_state = {}
+        self.logger = logging.getLogger(__name__)  # Logger for Bot
         self.database = DatabaseService()
         self.handlers = []
         self.register_handlers()
@@ -36,11 +45,14 @@ class Bot:
             @self.bot.message_handler(**kwargs)  # Extract register logic to here
             async def wrapper(message):
                 return await func(message)  # self here and await
+
             return wrapper  # Return function for decoration
+
         return decorator
 
     def register_handlers(self):
         """Registers handlers that have been decorated"""
+
         @self.handler(func=lambda message: message.text == 'Новый' or message.text == '/create_user')
         async def create_new_user(message):
             self.log(message)
@@ -54,38 +66,44 @@ class Bot:
                                         "You can use command /view to check your workspaces\n"
                                         "You can use command /create_workspace to create new workspace")
             # TODO Buttons for commands
-            except SQLAlchemyError as error:
-                self.logger.error(f"Error upon creating user with username - {chat.username}. \n Full message - {message}",
-                              exc_info=True)
+            except SQLAlchemyError:
+                self.logger.error(
+                    f"Error upon creating user with username - {chat.username}. \n Full message - {message}",
+                    exc_info=True)
                 await self.bot.reply_to(message, "There was an error with your request")
 
         @self.handler(commands=['create_workspace'])
         async def create_workspace_handler(message):
             username = message.chat.username
             try:
-                self.logger.info(f"User {username} triggered /create_workspace") # log here
+                self.logger.info(f"User {username} triggered /create_workspace")  # log here
                 self.set_state(username, "creating workspace")  # Move to the NAME_WORKSPACE state
                 await self.bot.send_message(message.chat.id, "What name would you like to give your workspace?")
-            except SQLAlchemyError as error:
-                self.logger.error(f"Error upon triggering /create_workspace with username - {username}. \n Full message - {message}",
-                              exc_info=True)
+            except SQLAlchemyError:
+                self.logger.error(
+                    f"Error upon triggering /create_workspace with username - {username}. \n Full message - {message}",
+                    exc_info=True)
                 await self.bot.send_message(message.chat.id, "There was an error with your request")
 
+        @self.handler(commands=[list(self.CLASS_FROM_STATE.keys())])
+        async def create_something_handler(message):
+            await self._create_something_handler(message)
 
         @self.handler(func=lambda message: self.check_state_and_create(message.chat.username) == "creating workspace")
         async def process_workspace_name(message):
             chat_id = message.chat.id
             workspace_name = message.text
             username = message.chat.username
-            self.logger.info(f"User {username} triggered /create_workspace and entered workspace name - {workspace_name}")
+            self.logger.info(
+                f"User {username} triggered /create_workspace and entered workspace name - {workspace_name}")
             try:
-                self.database.create(Workspace, {"name": workspace_name, "owner_name": username})
+                self.database.create(BDWorkspace, {"name": workspace_name, "owner_name": username})
                 self.logger.info(f"Creating new Workspace for {username} named {workspace_name}")
                 await self.bot.send_message(chat_id,
                                             f"Successfully created Workspace named: {workspace_name}.\n"
                                             "You can use command /view to check your workspaces")
             # TODO Buttons for commands
-            except SQLAlchemyError as error:
+            except SQLAlchemyError:
                 self.logger.error(
                     f"Error upon creating Workspace for {username} named {workspace_name}. \n Full message - {message}",
                     exc_info=True)
@@ -93,13 +111,17 @@ class Bot:
             finally:
                 self.clear_state(username)
 
+        @self.handler(func=lambda message: self.check_state_and_create(message.chat.username) in         "creating workspace")
+        async def create_workspace_handler(message):
+            pass
+
         @self.handler(commands=['start'])
         async def send_start(message):
             self.log(message)
             keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
             print(message)
             username = message.chat.username
-            db_user = self.database.get_by_custom_field(User, "telegram_username", username)
+            db_user = self.database.get_by_custom_field(BDUser, "telegram_username", username)
             if db_user:
                 await self.bot.reply_to(message, f"Hello, {db_user.username}, how can I help you? \n"
                                                  "/view to view your workspaces \n"
@@ -126,31 +148,22 @@ class Bot:
             self.logger.info(self.check_state_and_create(message.chat.username) == "creating workspace")
             self.logger.info(f"There is an unprocessed message: {message.text}\n Full message - {message}")
 
-    def create_something_with_state(self, message, command_name, state_name,
-                         object_name):
-        username = message.chat.username
-        try:
-            self.logger.info(f"User {username} triggered {command_name}")
-            self.set_state(username, state_name)
-            return self.bot.send_message(message.chat.id, f"What name would you like to give your {object_name}?")
-        except SQLAlchemyError as error:
-            self.logger.error(
-                f"Error upon triggering {command_name} with username - {username}. \n Full message - {message}",
-                exc_info=True)
-            return self.bot.send_message(message.chat.id, "There was an error with your request")
-
+    # TODO update parse_message, so it can parse message with no explicit fields
     def parse_message(self, message) -> Dict[str, Any]:
+        self.logger.info(f"User {message.chat.username} triggered parse_message message - {message.text}")
         text = message.text
         result = {"error": None}
         boolean_dict = {
             "Да": True,
             "Нет": False,
-            "1" : True,
-            "0" : False,
-            "Y" : True,
-            "N" : False,
+            "1": True,
+            "0": False,
+            "Y": True,
+            "N": False,
             "True": True,
-            "False" : False,
+            "False": False,
+            "Yes": True,
+            "No": False,
         }
         try:
             lines = text.splitlines()
@@ -161,9 +174,10 @@ class Bot:
                 if match:
                     field = match.group(1).strip()
                     value = match.group(2).strip()
-                    if field == "Завершено":
+                    if field == "Completed":
                         value = boolean_dict[value]
                     result[field] = str(value)
+            self.logger.info(f"User {message.chat.username} finished parse_message - successfully")
         except Exception as e:
             self.logger.error(f"Error parsing message - {e}\n Full message - {message}")
             result['error'] = e
@@ -171,12 +185,14 @@ class Bot:
             return result
 
     def validate_message(self, message, cls: Type) -> Any:
+        self.logger.info(f"User {message.chat.username} triggered validate_message for class {cls}")
         parsed_dict = self.parse_message(message)
         if parsed_dict['error']:
             raise parsed_dict['error']
         else:
             try:
                 validated_model = cls(**parsed_dict)
+                self.logger.info(f"User {message.chat.username} finished validate_message - successfully")
             except ValidationError as e:
                 self.logger.error(f"Error validation message from user {message.chat.username}\n"
                                   f"Message - {parsed_dict}\n"
@@ -184,48 +200,85 @@ class Bot:
                 raise e
         return validated_model
 
-
-
     def process_something_with_state(self, message):
         chat_id = message.chat.id
         username = message.chat.username
-        # cls_from_state_dict =
+        try:
+            self.logger.info(f"User {username} triggered process_something_with_state")
+            state = self.check_state_and_create(message.chat.username)
+            cls, bd_cls = self.CLASS_FROM_STATE[state]
+            validated_model = self.validate_message(message, cls)
+            self.database.create(bd_cls, validated_model.__dict__)
 
+            self.logger.info(f"User {message.chat.username} finished process_something_with_state - successfully\n"
+                             f"created {cls} with fields {validated_model.__dict__}\n")
+            return self.bot.send_message(chat_id,
+                                         f"Successfully created {cls.__name__} named: {validated_model.name}.\n"
+                                         f"You can use command /view_{cls.__name__} to check your {cls.__name__}\n")
+        except SQLAlchemyError:
+            self.logger.error(
+                f"Error upon processing message for {username}. \n Full message - {message}",
+                exc_info=True)
+            return self.bot.send_message(chat_id, "There was an error with your request")
+        except ValidationError:
+            self.logger.error(f"re raising ValidationError")
+            return self.bot.send_message(chat_id, "There was an error with your request")
+        finally:
+            self.clear_state(username)
 
     def set_state(self, telegram_username, state):
         self.check_state_and_create(telegram_username)
-        self.database.update(UserState, telegram_username, {"state": state})
+        self.database.update(BDUserState, telegram_username, {"state": state})
+        self.cached_state[telegram_username] = state
 
     def check_state_and_create(self, telegram_username):
-        if not (state := self.database.get_by_id(UserState,telegram_username)):
-            self.database.create(UserState,{"telegram_username": telegram_username, "state": None})
+        if self.cached_state[telegram_username]:
+            return self.cached_state[telegram_username]
+        if not (state := self.database.get_by_id(BDUserState, telegram_username)):
+            self.database.create(BDUserState, {"telegram_username": telegram_username, "state": None})
+            self.cached_state[telegram_username] = None
             return None
         else:
             return state
 
     def clear_state(self, telegram_username):
-        if self.database.get_by_id(UserState,telegram_username):
-            self.database.delete(UserState, telegram_username)
+        if self.database.get_by_id(BDUserState, telegram_username):
+            self.database.delete(BDUserState, telegram_username)
+        if self.cached_state[telegram_username]:
+            del self.cached_state[telegram_username]
 
     def log(self, message):
         self.logger.info(message)
 
     def about(self, message):
-        return self.bot.send_message(message.chat.id, "Hello, im Progressor bot, i'll help to keep track of your progress in any field")
+        return self.bot.send_message(message.chat.id,
+                                     "Hello, im Progressor bot, i'll help to keep track of your progress in any field")
 
+    async def _create_something_handler(self, message):
+        username = message.chat.username
+        try:
+            state = message.text
+            self.logger.info(f"User {username} triggered {message.text}")
+            self.set_state(username, state)
+            await self.bot.send_message(message.chat.id, Messages.MESSAGE_FROM_STATE[state])
+        except SQLAlchemyError:
+            self.logger.error(
+                f"Error upon triggering {message.text} with username - {username}. \n Full message - {message}",
+                exc_info=True)
+            await self.bot.send_message(message.chat.id, "There was an error with your request")
 
     async def start_polling(self):
         self.log("Starting bot polling...")
         await self.bot.polling()
 
+
 async def main():
     load_dotenv()
-    token = os.getenv('TOKEN') # Read token
+    token = os.getenv('TOKEN')
 
-    telegram_bot = Bot(token) # Start bot
+    telegram_bot = Bot(token)
     await telegram_bot.start_polling()
+
 
 if __name__ == '__main__':
     asyncio.run(main())
-
-
