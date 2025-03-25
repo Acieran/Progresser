@@ -50,21 +50,26 @@ def test_process_tasklist_success(bot, mocker):
                                               )
     assert bot.check_state_and_create("test_user") is None
 
-@pytest.mark.asyncio
-async def test_process_something_with_state_validation_error(bot):
-    """Test process something with state raises ValidationError"""
-    message_text = "Имя - " + "A" * 31 + "\nworkspace_name - Test Workspace"
+def test_process_task_success(bot, mocker):
+    """Test successful processing of a Task object."""
+    message_text = "Name - My Task\nList Name - My TaskList"
     message_mock = create_message_mock(message_text)
-    bot.set_state("test_user", "/create_TaskList")
+    cls = "Task"
+    name = "My Task"
+    bot.set_state("test_user", "/create_TaskList")  # Set the state
+    mocker.patch.object(bot.bot, "send_message", new_callable=AsyncMock)
+    bot._process_something_with_state(message_mock)
 
-    # Mock send_message to avoid actually sending
-    bot.bot.send_message = AsyncMock()
+    db_record = bot.database.get_by_custom_field(TaskList, "name", "My TaskList") # Assert that DB was called
+    assert db_record.name == "My TaskList"
+    assert db_record.workspace_name == "My Workspace"
+    #check that bot.send message was called.# Real token is optional. Bot object initialization
 
-    await bot._process_something_with_state(message_mock)
-
-    # Assert send_message was called with some error message
-    bot.bot.send_message.assert_called_once()
-    assert "There was an error with your request" in str(bot.bot.send_message.call_args)
+    bot.bot.send_message.assert_called_once_with(chat_id_dotenv,
+                                              f"Successfully created {cls} named: {name}.\n"
+                                              f"You can use command /view_{cls} to check your {cls}\n"
+                                              )
+    assert bot.check_state_and_create("test_user") is None
 
 @pytest.mark.asyncio
 async def test_process_something_with_state_sqlalchemy_error(bot):
