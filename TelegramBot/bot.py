@@ -111,9 +111,9 @@ class Bot:
             finally:
                 self.clear_state(username)
 
-        @self.handler(func=lambda message: self.check_state_and_create(message.chat.username) in         "creating workspace")
-        async def create_workspace_handler(message):
-            pass
+        @self.handler(func=lambda message: self.check_state_and_create(message.chat.username) in list(self.CLASS_FROM_STATE.keys()))
+        async def process_something_with_state(message):
+            await self._process_something_with_state(message)
 
         @self.handler(commands=['start'])
         async def send_start(message):
@@ -200,7 +200,7 @@ class Bot:
                 raise e
         return validated_model
 
-    def process_something_with_state(self, message):
+    def _process_something_with_state(self, message):
         chat_id = message.chat.id
         username = message.chat.username
         try:
@@ -232,11 +232,13 @@ class Bot:
         self.cached_state[telegram_username] = state
 
     def check_state_and_create(self, telegram_username):
-        if self.cached_state[telegram_username]:
-            return self.cached_state[telegram_username]
+        try:
+            if self.cached_state[telegram_username]:
+                return self.cached_state[telegram_username]
+        except KeyError:
+            self.cached_state[telegram_username] = None
         if not (state := self.database.get_by_id(BDUserState, telegram_username)):
             self.database.create(BDUserState, {"telegram_username": telegram_username, "state": None})
-            self.cached_state[telegram_username] = None
             return None
         else:
             return state

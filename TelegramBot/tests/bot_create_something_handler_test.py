@@ -4,7 +4,6 @@ import pytest
 from unittest.mock import AsyncMock, patch
 
 from dotenv import load_dotenv
-from sqlalchemy.exc import SQLAlchemyError
 
 from TelegramBot.bot import Bot
 from resources.statics import Messages
