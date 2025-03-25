@@ -13,8 +13,8 @@ from telebot.async_telebot import AsyncTeleBot
 
 from DataBase.database_service import DatabaseService
 from DataBase.schemas import User as BDUser, Workspace as BDWorkspace, UserState as BDUserState, Task as BDTask, \
-    TaskList as BDTaskList
-from resources.pydantic_classes import TaskList, Task
+    TaskList as BDTaskList, Workspace as BDWorkspace
+from resources.pydantic_classes import Task
 from resources.statics import Messages
 
 # --- Configuration ---
@@ -30,8 +30,8 @@ logging.basicConfig(
 class Bot:
     def __init__(self, token):
         self.CLASS_FROM_STATE = {
-            "/create_TaskList": (TaskList, BDTaskList),
-            "/create_Task": (Task, BDTask)
+            # "/create_TaskList": (TaskList, BDTaskList, BDWorkspace),
+            "/create_Task": (Task, BDTask, BDWorkspace)
         }
         self.bot = AsyncTeleBot(token=token)
         self.cached_state = {}
@@ -115,6 +115,10 @@ class Bot:
         async def process_something_with_state(message):
             await self._process_something_with_state(message)
 
+        @self.handler(func=lambda message: str(message.text).startswith('/view'))
+        async def view_something(message):
+            await self._view_something(message)
+
         @self.handler(commands=['start'])
         async def send_start(message):
             self.log(message)
@@ -124,7 +128,7 @@ class Bot:
             db_user = self.database.get_by_custom_field(BDUser, "telegram_username", username)
             if db_user:
                 await self.bot.reply_to(message, f"Hello, {db_user.username}, how can I help you? \n"
-                                                 "/view to view your workspaces \n"
+                                                 '"/view component name" view your workspaces \n'
                                                  "/create_workspace to create new workspace")
             else:
                 keyboard.row(
@@ -150,9 +154,41 @@ class Bot:
 
     # TODO update parse_message, so it can parse message with no explicit fields
     def parse_message(self, message) -> Dict[str, Any]:
+        """
+        Parses a multi-line message string to extract key-value pairs.
+
+        The message is expected to be in the format "key - value" on separate lines.
+        The extracted key-value pairs are stored in a dictionary, which is then returned.
+        A boolean dictionary is used to convert string representations of booleans to actual boolean types.
+
+        Args:
+            message: A telegram message object containing the text to parse.  Specifically the `message.text` attribute is used.
+
+        Returns:
+            A dictionary containing the extracted key-value pairs.  The keys are strings
+            extracted from the message, and the values are strings or booleans (if the key
+            is "Completed" and the value can be converted to a boolean).  Returns a dictionary.
+
+        Raises:
+            KeyError: If the value for 'Completed' is not found in the `boolean_dict`.
+            AttributeError: Can be raised by the `re.match` or string operations.
+
+        Example:
+            Given a message with the following text:
+            "Task - Buy groceries
+            Completed - Yes
+            Due Date - 2023-12-25"
+
+            The function would return:
+            {
+                "Task": "Buy groceries",
+                "Completed": True,
+                "Due Date": "2023-12-25"
+            }
+        """
         self.logger.info(f"User {message.chat.username} triggered parse_message message - {message.text}")
         text = message.text
-        result = {"error": None}
+        result = {}
         boolean_dict = {
             "Да": True,
             "Нет": False,
@@ -178,50 +214,66 @@ class Bot:
                         value = boolean_dict[value]
                     result[field] = str(value)
             self.logger.info(f"User {message.chat.username} finished parse_message - successfully")
-        except Exception as e:
+        except (AttributeError,KeyError) as e:
             self.logger.error(f"Error parsing message - {e}\n Full message - {message}")
-            result['error'] = e
+            raise e
         finally:
             return result
 
     def validate_message(self, message, cls: Type) -> Any:
         self.logger.info(f"User {message.chat.username} triggered validate_message for class {cls}")
-        parsed_dict = self.parse_message(message)
-        if parsed_dict['error']:
-            raise parsed_dict['error']
-        else:
-            try:
-                validated_model = cls(**parsed_dict)
-                self.logger.info(f"User {message.chat.username} finished validate_message - successfully")
-            except ValidationError as e:
-                self.logger.error(f"Error validation message from user {message.chat.username}\n"
-                                  f"Message - {parsed_dict}\n"
-                                  f"Error - {e}")
-                raise e
-        return validated_model
+        try:
+            parsed_dict = self.parse_message(message)
+        except (AttributeError, KeyError) as e:
+            raise e
 
-    def _process_something_with_state(self, message):
+        try:
+            validated_model = cls(**parsed_dict)
+            self.logger.info(f"User {message.chat.username} finished validate_message - successfully")
+            return validated_model
+        except ValidationError as e:
+            self.logger.error(f"Error validation message from user {message.chat.username}\n"
+                              f"Message - {parsed_dict}\n"
+                              f"Error - {e}")
+            raise e
+
+    def _process_something_with_state(self, message, send_additional_error_info: bool = False):
         chat_id = message.chat.id
         username = message.chat.username
         try:
             self.logger.info(f"User {username} triggered process_something_with_state")
             state = self.check_state_and_create(message.chat.username)
-            cls, bd_cls = self.CLASS_FROM_STATE[state]
-            validated_model = self.validate_message(message, cls)
-            self.database.create(bd_cls, validated_model.__dict__)
-
+            cls, bd_cls, bd_cls_parent = self.CLASS_FROM_STATE[state]
+            validated_model_dict = self.validate_message(message, cls).__dict__
+            parent_record = self.database.get_by_custom_fields(bd_cls_parent,
+                                                               owner_name = username,
+                                                               name = validated_model_dict["parent_name"]
+                                                               )
+            if not parent_record:
+                send_additional_error_info = True
+                raise SQLAlchemyError(f"Parent record with Name {validated_model_dict["parent_name"]} in {bd_cls_parent.__name__} doesn't exist")
+            else:
+                parent_record = parent_record[0].__dict__
+                del validated_model_dict["parent_name"]
+                validated_model_dict["parent_id"] = parent_record["id"]
+            validated_model_dict["owner_name"] = username
+            self.database.create(bd_cls, validated_model_dict)
             self.logger.info(f"User {message.chat.username} finished process_something_with_state - successfully\n"
-                             f"created {cls} with fields {validated_model.__dict__}\n")
+                             f"created {cls} with fields {validated_model_dict}\n")
             return self.bot.send_message(chat_id,
-                                         f"Successfully created {cls.__name__} named: {validated_model.name}.\n"
+                                         f"Successfully created {cls.__name__} named: {validated_model_dict["name"]}.\n"
                                          f"You can use command /view_{cls.__name__} to check your {cls.__name__}\n")
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             self.logger.error(
-                f"Error upon processing message for {username}. \n Full message - {message}",
+                f"Error upon processing message for {username}. \n"
+                f"Error - {str(e)}\n"
+                f"Full message - {message}",
                 exc_info=True)
-            return self.bot.send_message(chat_id, "There was an error with your request")
-        except ValidationError:
-            self.logger.error(f"re raising ValidationError")
+            error_text = "There was an error with your request"
+            if send_additional_error_info: error_text = error_text + f"\n{str(e)}"
+            return self.bot.send_message(chat_id, error_text)
+        except (ValidationError, AttributeError, KeyError):
+            self.logger.error(f"re raising error")
             return self.bot.send_message(chat_id, "There was an error with your request")
         finally:
             self.clear_state(username)
@@ -268,6 +320,48 @@ class Bot:
                 f"Error upon triggering {message.text} with username - {username}. \n Full message - {message}",
                 exc_info=True)
             await self.bot.send_message(message.chat.id, "There was an error with your request")
+
+    def _view_something(self, message):
+        text = message.text
+        username = message.chat.username
+        available_classes = {BDWorkspace.__name__: BDWorkspace,
+                             BDTask.__name__: BDTask,
+                             }
+        self.logger.info(f"User {username} triggered process_something_with_state")
+        split_text = text.split()
+        if len(split_text) != 3:
+            return self.bot.send_message(message.chat.id,
+                                         "Please specify what you want to view\n"
+                                         "Example: /view Workspace Workspace_Name")
+        elif split_text[1] not in available_classes.keys():
+            return self.bot.send_message(message.chat.id,
+                                         "Component not found, please check the spelling"
+                                         f"it should be one of {available_classes.keys()}")
+        else:
+            records = self.database.get_by_custom_fields(available_classes[split_text[1]],
+                                               name=split_text[2],
+                                               owner_name=username)
+            if not records:
+                return self.bot.send_message(message.chat.id,
+                                             f"Record with name {split_text[2]} in component {split_text[1]} doesn't exist")
+            else:
+                record = records[0]
+
+    def _calculate_progress(self, record) -> float:
+        cls = record.__class__
+        cls_parent_mapper = {BDWorkspace: BDTaskList,
+                             BDTaskList: BDTask}
+        # rows = self.database.get_by_custom_fields(cls,
+        #                                        name=split_text[2],
+        #                                        owner_name=username)
+        # for row in
+        # sum_completed = 0
+        # sum_all = 0
+
+
+
+
+
 
     async def start_polling(self):
         self.log("Starting bot polling...")

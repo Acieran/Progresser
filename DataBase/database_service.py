@@ -1,6 +1,6 @@
-from typing import Type, Any, Dict, Optional, get_type_hints
+from typing import Type, Any, Dict, Optional, get_type_hints, List
 
-from sqlalchemy import create_engine, exc, inspect
+from sqlalchemy import create_engine, exc, inspect, select
 from sqlalchemy.orm import Session, DeclarativeMeta, DeclarativeBase, sessionmaker
 
 from .schemas import Base, User, UserState
@@ -86,7 +86,42 @@ class DatabaseService:
             return result
 
         except exc.SQLAlchemyError as e:
-             print(f"Error during query: {e}")
+             raise e
+        finally:
+            if own_session:
+                session.close()
+
+    def get_by_custom_fields(self, model: Type[Base], *, session: Optional[Session] = None, **kwargs) -> List[dict]:
+        """
+        Retrieves records from the database based on multiple custom fields specified as keyword arguments.
+
+        Args:
+            model: The SQLAlchemy model class to query.
+            session: The SQLAlchemy session object.
+            **kwargs: Keyword arguments representing the custom fields and their values to search for.
+                       For example: `username="testuser", email="test@example.com"`
+
+        Returns:
+            A list of records that match the specified search criteria.
+        """
+        own_session = False
+        try:
+            if session is None:
+                session = self.SessionLocal()
+                own_session = True
+
+            query = select(model)
+            for field, value in kwargs.items():
+                column = getattr(model, field, None)  # Get the column object from the model
+                if column is None:
+                    raise ValueError(f"Model '{model.__name__}' has no attribute '{field}'")
+                query = query.where(column == value)
+
+            # Execute the query and return the results
+            result = session.execute(query).scalars().all()
+            return list(result)
+
+        except exc.SQLAlchemyError as e:
              raise e
         finally:
             if own_session:

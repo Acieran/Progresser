@@ -31,8 +31,18 @@ def test_validate_tasklist_success(bot):
     tasklist = bot.validate_message(message_mock, TaskList)
     assert isinstance(tasklist, TaskList)
     assert tasklist.name == "My TaskList"
-    assert tasklist.workspace_name == "My Workspace"
+    assert tasklist.parent_name == "My Workspace"
     assert tasklist.weight == 50.0 # Test Weight
+
+def test_validate_task_success(bot):
+    """Test successful validation of a TaskList object."""
+    message_text = "Name - My Task\nList Name - My Workspace\nWeight - 50"
+    message_mock = create_message_mock(message_text)
+    task = bot.validate_message(message_mock, Task)
+    assert isinstance(task, Task)
+    assert task.name == "My Task"
+    assert task.parent_name == "My Workspace"
+    assert task.weight == 50.0 # Test Weight
 
 def test_validate_task_invalid_weight(bot):
     """Test validation failure due to an invalid weight value."""
