@@ -11,7 +11,13 @@ class DatabaseService:
     def __init__(self):
         self.engine = create_engine("sqlite:///DataBase/progresser.db", echo=True)
         Base.metadata.create_all(self.engine)
-        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine, expire_on_commit=False)
+
+    def create_session(self):
+        return self.SessionLocal()
+
+    def close_session(self, session: Session):
+        session.close()
 
     def create(self, model: Type, data: Dict[str, Any], session: Optional[Session] = None) -> Any:
         """Creates a new record in the database."""

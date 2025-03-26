@@ -85,7 +85,7 @@ class Bot:
                     exc_info=True)
                 await self.bot.send_message(message.chat.id, "There was an error with your request")
 
-        @self.handler(commands=[list(self.CLASS_FROM_STATE.keys())])
+        @self.handler(func=lambda message: str(message.text).startswith('/create'))
         async def create_something_handler(message):
             await self._create_something_handler(message)
 
@@ -117,7 +117,11 @@ class Bot:
 
         @self.handler(func=lambda message: str(message.text).startswith('/view'))
         async def view_something(message):
-            await self._view_something(message)
+            try:
+                await self._view_something(message)
+            except Exception as e:
+                self.logger.error(e)
+                await self.bot.reply_to(message, "There was an error with your request")
 
         @self.handler(commands=['start'])
         async def send_start(message):
@@ -212,6 +216,7 @@ class Bot:
                     value = match.group(2).strip()
                     if field == "Completed":
                         value = boolean_dict[value]
+                    # if field == "Weight": float(value)
                     result[field] = str(value)
             self.logger.info(f"User {message.chat.username} finished parse_message - successfully")
         except (AttributeError,KeyError) as e:
@@ -336,62 +341,67 @@ class Bot:
                 exc_info=True)
             await self.bot.send_message(message.chat.id, "There was an error with your request")
 
-    def _view_something(self, message):
+    async def _view_something(self, message):
         text = message.text
         username = message.chat.username
         available_classes = {BDWorkspace.__name__: BDWorkspace,
                              BDTask.__name__: BDTask,
                              }
-        self.logger.info(f"User {username} triggered process_something_with_state")
+        self.logger.info(f"User {username} triggered _view_something")
         split_text = text.split()
-        if len(split_text) != 3:
-            return self.bot.send_message(message.chat.id,
+        if len(split_text) < 3:
+            await self.bot.send_message(message.chat.id,
                                          "Please specify what you want to view\n"
                                          "Example: /view Workspace Workspace_Name")
         elif split_text[1] not in available_classes.keys():
-            return self.bot.send_message(message.chat.id,
+            await self.bot.send_message(message.chat.id,
                                          "Component not found, please check the spelling"
                                          f"it should be one of {available_classes.keys()}")
         else:
+            session = self.database.create_session()
             records = self.database.get_by_custom_fields(available_classes[split_text[1]],
-                                               name=split_text[2],
-                                               owner_name=username)
+                                               name=' '.join(split_text[2:]),
+                                               owner_name=username,session=session)
             if not records:
-                return self.bot.send_message(message.chat.id,
+                await self.bot.send_message(message.chat.id,
                                              f"Record with name {split_text[2]} in component {split_text[1]} doesn't exist")
             else:
                 record = records[0]
                 record_progress = self._calculate_progress(record)
-                message = f"{Bot.create_telegram_progress_bar(record_progress)}\n"\
-                          f"{record.name}\n"\
-                          f"{textwrap.wrap(record.description, width=100)}"
-                cls = record.__class__
-                child_records = record.child_tasks if cls == BDTask else record.tasks
+                self.database.close_session(session)
+                msg = f"{Bot.create_telegram_progress_bar(record_progress)}\n"\
+                          f"{record.name}\n"
+                if record.description:
+                    text_wrap = textwrap.wrap(record.description, width=100)
+                    for row in text_wrap:
+                        msg += f"{row}\n"
+                child_records = record.child_tasks
                 for child in child_records:
                     progress_bar = Statics.COMPONENTS_PROGRESS[(child.id,child.__class__)]
-                    message += f"    {child.name:<{80}} {progress_bar}"
-                return self.bot.send_message(message.chat.id,message)
+                    progress_bar = Bot.create_telegram_progress_bar(progress_bar)
+                    msg += f"    {child.name:<{50}} {progress_bar}\n"
+                await self.bot.send_message(message.chat.id,msg)
 
 
     def _calculate_progress(self, record) -> float:
-        cls = record.__class__
-        if (record.id,cls) in Statics.COMPONENTS_PROGRESS.keys():
-            return Statics.COMPONENTS_PROGRESS[(record.id, cls)]
-        else:
-            sum_completed = 0
-            sum_all = 0
-            child_records = record.child_tasks if cls == BDTask else record.tasks
-            if not child_records and cls == BDTask:
-                Statics.COMPONENTS_PROGRESS[(record.id,cls)] = record.completed * 100
-                return record.completed * 100
-            for rec in child_records:
-                rec_progress = self._calculate_progress(rec) / 100
-                sum_all += rec.weight
-                if rec.completed:
-                    sum_completed += rec_progress * rec.weight
-            record_progress = sum_completed / sum_all * 100 if sum_all > 0 else 0
-            Statics.COMPONENTS_PROGRESS[(record.id,cls)] = record_progress
-            return record_progress
+            cls = record.__class__
+            if (record.id,cls) in Statics.COMPONENTS_PROGRESS.keys():
+                return Statics.COMPONENTS_PROGRESS[(record.id, cls)]
+            else:
+                sum_completed = 0
+                sum_all = 0
+                child_records = record.child_tasks
+                if not child_records and cls == BDTask:
+                    Statics.COMPONENTS_PROGRESS[(record.id,cls)] = record.completed * 100
+                    return record.completed * 100
+                for rec in child_records:
+                    rec_progress = self._calculate_progress(rec) / 100
+                    sum_all += rec.weight
+                    if rec.completed:
+                        sum_completed += rec_progress * rec.weight
+                record_progress = sum_completed / sum_all * 100 if sum_all > 0 else 0
+                Statics.COMPONENTS_PROGRESS[(record.id,cls)] = record_progress
+                return record_progress
 
     @staticmethod
     def create_progress_bar(progress: float, total_length: int = 10, filled_char: str = "█",

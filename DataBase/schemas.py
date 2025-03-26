@@ -17,7 +17,7 @@ class Workspace(Base):
     description: Mapped[Optional[str]] = mapped_column(String(1000),nullable=True)
     owner_name: Mapped[str] = mapped_column(ForeignKey("users.username"))
     owner: Mapped["User"] = relationship(back_populates="workspace")
-    tasks: Mapped[List["Task"]] = relationship("Task", back_populates="workspace", cascade="all, delete-orphan")
+    child_tasks: Mapped[List["Task"]] = relationship("Task", back_populates="workspace", cascade="all, delete-orphan")
     def __repr__(self) -> str:
         return f"Item(Name={self.name!r}, Owner={self.owner_name!r}, Description={self.description!r})"
 
@@ -67,7 +67,7 @@ class Task(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"))
-    workspace: Mapped["Workspace"] = relationship(back_populates="tasks")
+    workspace: Mapped["Workspace"] = relationship(back_populates="child_tasks")
 
     parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tasks.id"), nullable=True)
     parent_task: Mapped[Optional["Task"]] = relationship(

@@ -18,7 +18,7 @@ def bot():
 def test_calculate_progress_already_in_cache(bot):
     # Arrange
     task = Task(id=1, name="Test Task", completed=False, child_tasks=[])
-    Statics.COMPONENTS_PROGRESS[1] = 50.0  # Pre-populate the cache
+    Statics.COMPONENTS_PROGRESS[(1, Task)] = 50.0  # Pre-populate the cache
 
     # Act
     progress = bot._calculate_progress(task)
@@ -37,7 +37,7 @@ def test_calculate_progress_no_children_completed_false(bot):
 
     # Assert
     assert progress == 0.0
-    assert Statics.COMPONENTS_PROGRESS[1] == 0.0  # Check the cache
+    assert Statics.COMPONENTS_PROGRESS[(1,Task)] == 0.0  # Check the cache
 
 
 def test_calculate_progress_no_children_completed_true(bot):
@@ -49,7 +49,7 @@ def test_calculate_progress_no_children_completed_true(bot):
 
     # Assert
     assert progress == 100.0
-    assert Statics.COMPONENTS_PROGRESS[1] == 100.0
+    assert Statics.COMPONENTS_PROGRESS[(1,Task)] == 100.0
 
 
 def test_calculate_progress_with_children_no_completion(bot):
@@ -63,9 +63,9 @@ def test_calculate_progress_with_children_no_completion(bot):
 
     # Assert
     assert progress == 0.0
-    assert Statics.COMPONENTS_PROGRESS[1] == 0.0
-    assert Statics.COMPONENTS_PROGRESS[2] == 0.0
-    assert Statics.COMPONENTS_PROGRESS[3] == 0.0
+    assert Statics.COMPONENTS_PROGRESS[(1,Task)] == 0.0
+    assert Statics.COMPONENTS_PROGRESS[(2,Task)] == 0.0
+    assert Statics.COMPONENTS_PROGRESS[(3,Task)] == 0.0
 
 
 def test_calculate_progress_with_children_some_completion(bot):
@@ -79,9 +79,9 @@ def test_calculate_progress_with_children_some_completion(bot):
 
     # Assert
     assert progress == 50.0
-    assert Statics.COMPONENTS_PROGRESS[1] == 50.0
-    assert Statics.COMPONENTS_PROGRESS[2] == 100.0
-    assert Statics.COMPONENTS_PROGRESS[3] == 0.0
+    assert Statics.COMPONENTS_PROGRESS[(1,Task)] == 50.0
+    assert Statics.COMPONENTS_PROGRESS[(2,Task)] == 100.0
+    assert Statics.COMPONENTS_PROGRESS[(3,Task)] == 0.0
 
 
 def test_calculate_progress_with_children_all_completion(bot):
@@ -95,9 +95,9 @@ def test_calculate_progress_with_children_all_completion(bot):
 
     # Assert
     assert progress == 100.0
-    assert Statics.COMPONENTS_PROGRESS[1] == 100.0
-    assert Statics.COMPONENTS_PROGRESS[2] == 100.0
-    assert Statics.COMPONENTS_PROGRESS[3] == 100.0
+    assert Statics.COMPONENTS_PROGRESS[(1,Task)] == 100.0
+    assert Statics.COMPONENTS_PROGRESS[(2,Task)] == 100.0
+    assert Statics.COMPONENTS_PROGRESS[(3,Task)] == 100.0
 
 
 def test_calculate_progress_with_nested_children(bot):
@@ -112,10 +112,10 @@ def test_calculate_progress_with_nested_children(bot):
 
     # Assert
     assert progress == 50.0
-    assert Statics.COMPONENTS_PROGRESS[1] == 50.0
-    assert Statics.COMPONENTS_PROGRESS[2] == 100.0
-    assert Statics.COMPONENTS_PROGRESS[3] == 0
-    assert Statics.COMPONENTS_PROGRESS[4] == 100.0
+    assert Statics.COMPONENTS_PROGRESS[(1,Task)] == 50.0
+    assert Statics.COMPONENTS_PROGRESS[(2,Task)] == 100.0
+    assert Statics.COMPONENTS_PROGRESS[(3,Task)] == 0
+    assert Statics.COMPONENTS_PROGRESS[(4,Task)] == 100.0
 
 def test_calculate_progress_with_children_different_weights(bot):
     # Arrange
@@ -132,11 +132,11 @@ def test_calculate_progress_with_children_different_weights(bot):
     assert progress == 25.0
     # 5 + 0  + 20 + 0 = 25
     # 5 + 10 + 20 + 65 = 100
-    assert Statics.COMPONENTS_PROGRESS[1] == 25.0
-    assert Statics.COMPONENTS_PROGRESS[2] == 100.0
-    assert Statics.COMPONENTS_PROGRESS[3] == 0
-    assert Statics.COMPONENTS_PROGRESS[4] == 0
-    assert Statics.COMPONENTS_PROGRESS[5] == 100.0
+    assert Statics.COMPONENTS_PROGRESS[(1,Task)] == 25.0
+    assert Statics.COMPONENTS_PROGRESS[(2,Task)] == 100.0
+    assert Statics.COMPONENTS_PROGRESS[(3,Task)] == 0
+    assert Statics.COMPONENTS_PROGRESS[(4,Task)] == 0
+    assert Statics.COMPONENTS_PROGRESS[(5,Task)] == 100.0
 
 
 def test_calculate_progress_with_zero_sum_all(bot):
@@ -150,6 +150,6 @@ def test_calculate_progress_with_zero_sum_all(bot):
 
     # Assert
     assert progress == 0.0  # Should not raise ZeroDivisionError
-    assert Statics.COMPONENTS_PROGRESS[1] == 0.0
-    assert Statics.COMPONENTS_PROGRESS[2] == 0.0
-    assert Statics.COMPONENTS_PROGRESS[3] == 0.0
+    assert Statics.COMPONENTS_PROGRESS[(1,Task)] == 0.0
+    assert Statics.COMPONENTS_PROGRESS[(2,Task)] == 0.0
+    assert Statics.COMPONENTS_PROGRESS[(3,Task)] == 0.0
