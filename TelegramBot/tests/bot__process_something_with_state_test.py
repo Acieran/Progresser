@@ -4,10 +4,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 from dotenv import load_dotenv
-from sqlalchemy.exc import SQLAlchemyError
-from telebot.async_telebot import AsyncTeleBot
 
-from DataBase.schemas import TaskList, Task, Workspace, User
+from DataBase.schemas import Task, Workspace, User
 from TelegramBot.bot import Bot
 
 load_dotenv()
@@ -36,23 +34,31 @@ def create_message_mock(text, username="test_user", chat_id=chat_id_dotenv):
     return message_mock
 
 
-def test_process_tasklist_success(bot):
+def test_process_task_with_parent_success(bot):
     """Test successful processing of a TaskList object."""
-    cls = TaskList
-    name = "My TaskList"
-    parent_name = "My Workspace"
+    cls = Task
+    name = "My Task"
+    workspace_name = "My Workspace"
+    parent_name = "My Parent Task"
     username = "test_user"
-    message_text = f"Name - {name}\nWorkspace Name - {parent_name}\nWeight - 50"
+    message_text = (f"Name - {name}\n"
+                    f"Workspace Name - {workspace_name}\n"
+                    f"Weight - 50\n"
+                    f"Parent Name - {parent_name}\n")
     message_mock = create_message_mock(message_text)
 
-    bot.database.create(Workspace, {"name": parent_name, "owner_name": username})
-    bot.set_state(username, "/create_TaskList")  # Set the state
+    bot.database.create(Workspace, {"name": workspace_name, "owner_name": username})
+    workspace_id = bot.database.get_by_custom_field(Workspace, "name", workspace_name).id
+    bot.database.create(Task, {"name": parent_name, "workspace_id": workspace_id, "owner_name": username})
+    bot.set_state(username, "/create_Task")  # Set the state
 
     bot._process_something_with_state(message_mock)
 
     db_record = bot.database.get_by_custom_field(cls, "name", name) # Assert that DB was called
     assert db_record.name == name
     assert db_record.parent_id is not None
+    assert db_record.workspace_id == workspace_id
+    assert db_record.owner_name == username
     #check that bot.send message was called.# Real token is optional. Bot object initialization
 
     bot.bot.send_message.assert_called_once_with(chat_id_dotenv,
@@ -61,19 +67,17 @@ def test_process_tasklist_success(bot):
                                               )
     assert bot.check_state_and_create("test_user") is None
 
-def test_process_task_success(bot):
+def test_process_task_no_parent_success(bot):
     """Test successful processing of a Task object."""
     cls = Task
     name = "My Task"
-    parent_workspace = "My Workspace"
-    parent_name = "My TaskList"
+    workspace_name = "My Workspace"
     username = "test_user"
-    message_text = f"Name - {name}\nList Name - {parent_name}"
+    message_text = f"Name - {name}\nWorkspace Name - {workspace_name}"
     message_mock = create_message_mock(message_text)
 
-    bot.database.create(Workspace, {"name": parent_workspace, "owner_name": username})
-    workspace_record = bot.database.get_by_custom_field(Workspace, "name", parent_workspace)
-    bot.database.create(TaskList, {"name": parent_name, "owner_name": username, "parent_id": workspace_record.id})
+    bot.database.create(Workspace, {"name": workspace_name, "owner_name": username})
+    workspace_record = bot.database.get_by_custom_field(Workspace, "name", workspace_name)
     bot.set_state("test_user", "/create_Task")  # Set the state
 
     bot._process_something_with_state(message_mock)
@@ -81,7 +85,9 @@ def test_process_task_success(bot):
     db_record = bot.database.get_by_custom_field(cls, "name", name) # Assert that DB was called
 
     assert db_record.name == name
-    assert db_record.parent_id is not None
+    assert db_record.parent_id is None
+    assert db_record.workspace_id == workspace_record.id
+    assert db_record.owner_name == username
 
     bot.bot.send_message.assert_called_once_with(chat_id_dotenv,
                                               f"Successfully created {cls.__name__} named: {name}.\n"
@@ -89,18 +95,17 @@ def test_process_task_success(bot):
                                               )
     assert bot.check_state_and_create("test_user") is None
 
-def test_process_tasklist_error_no_parent(bot):
+def test_process_tasklist_error_no_parent_workspace(bot):
     """Test errorful processing of a TaskList object if no parent exists"""
-    cls = TaskList
+    cls = Task
     bd_cls_parent = Workspace
-    name = "My TaskList"
-    parent_name = "My Workspace"
+    name = "My Task"
+    workspace_name = "My Workspace"
     username = "test_user"
-    message_text = f"Name - {name}\nWorkspace Name - {parent_name}\nWeight - 50"
+    message_text = f"Name - {name}\nWorkspace Name - {workspace_name}\nWeight - 50"
     message_mock = create_message_mock(message_text)
 
-    bot.set_state(username, "/create_TaskList")  # Set the state
-
+    bot.set_state(username, "/create_Task")  # Set the state
 
     bot._process_something_with_state(message_mock)
 
@@ -109,19 +114,23 @@ def test_process_tasklist_error_no_parent(bot):
 
     bot.bot.send_message.assert_called_once_with(chat_id_dotenv,
                                               f"There was an error with your request\n"
-                                              f"Parent record with Name {parent_name} in {bd_cls_parent.__name__} doesn't exist"
+                                              f"Parent record with Name {workspace_name} in {bd_cls_parent.__name__} doesn't exist"
                                               )
     assert bot.check_state_and_create("test_user") is None
 
-def test_process_task_error_no_parent(bot):
+def test_process_task_error_no_parent_task(bot):
     """Test errorful processing of a Task object if no parent exists."""
     cls = Task
     name = "My Task"
-    bd_cls_parent = TaskList
-    parent_name = "My TaskList"
+    workspace_name = "My Workspace"
+    parent_name = "My Task"
     username = "test_user"
-    message_text = f"Name - {name}\nList Name - {parent_name}"
+    message_text = (f"Name - {name}\n"
+                    f"Workspace Name - {workspace_name}\n"
+                    f"Parent Name - {parent_name}")
     message_mock = create_message_mock(message_text)
+
+    bot.database.create(Workspace, {"name": workspace_name, "owner_name": username})
 
     bot.set_state(username, "/create_Task")  # Set the state
 
@@ -133,6 +142,6 @@ def test_process_task_error_no_parent(bot):
 
     bot.bot.send_message.assert_called_once_with(chat_id_dotenv,
                                                  f"There was an error with your request\n"
-                                                 f"Parent record with Name {parent_name} in {bd_cls_parent.__name__} doesn't exist"
+                                                 f"Parent record with Name {parent_name} in {cls.__name__} doesn't exist"
                                                  )
     assert bot.check_state_and_create("test_user") is None

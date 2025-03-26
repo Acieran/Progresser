@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 from dotenv import load_dotenv
 
 from TelegramBot.bot import Bot
-from resources.statics import Messages
+from resources.statics import Statics
 
 load_dotenv()
 token = os.getenv('TOKEN')
@@ -32,7 +32,7 @@ def mock_message():
 @pytest.mark.asyncio
 async def test__create_something_handler_success(bot_instance, mock_message):
     # Test the correct behavior
-    mock_message.text = "/create_TaskList"
+    mock_message.text = "/create_Task"
     assert correct_class(bot_instance,mock_message.text) == True
 
     with (
@@ -42,13 +42,13 @@ async def test__create_something_handler_success(bot_instance, mock_message):
 
         await bot_instance._create_something_handler(mock_message)
 
-        mock_set_state.assert_called_once_with("testuser", "/create_TaskList")
+        mock_set_state.assert_called_once_with("testuser", "/create_Task")
         mock_send_message.assert_called_once()
 
         # Test if method is set correctly and with all parameters that should be present
         args, kwargs = mock_send_message.call_args
         assert args[0] == chat_id
-        assert args[1] == Messages.MESSAGE_FROM_STATE["/create_TaskList"]
+        assert args[1] == Statics.MESSAGE_FROM_STATE["/create_Task"]
 
 # @pytest.mark.asyncio
 # async def test__create_something_handler_sql_error(bot_instance, mock_message):

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 from dotenv import load_dotenv
 from pydantic import ValidationError
 
-from resources.pydantic_classes import TaskList, Task
+from resources.pydantic_classes import Task
 from TelegramBot.bot import Bot
 
 @pytest.fixture
@@ -24,24 +24,32 @@ def create_message_mock(text, username="test_user", chat_id=123):
     message_mock.chat.id = chat_id
     return message_mock
 
-def test_validate_tasklist_success(bot):
-    """Test successful validation of a TaskList object."""
-    message_text = "Name - My TaskList\nWorkspace Name - My Workspace\nWeight - 50"
-    message_mock = create_message_mock(message_text)
-    tasklist = bot.validate_message(message_mock, TaskList)
-    assert isinstance(tasklist, TaskList)
-    assert tasklist.name == "My TaskList"
-    assert tasklist.parent_name == "My Workspace"
-    assert tasklist.weight == 50.0 # Test Weight
+# def test_validate_tasklist_success(bot):
+#     """Test successful validation of a TaskList object."""
+#     message_text = "Name - My TaskList\nWorkspace Name - My Workspace\nWeight - 50"
+#     message_mock = create_message_mock(message_text)
+#     tasklist = bot.validate_message(message_mock, TaskList)
+#     assert isinstance(tasklist, TaskList)
+#     assert tasklist.name == "My TaskList"
+#     assert tasklist.parent_name == "My Workspace"
+#     assert tasklist.weight == 50.0 # Test Weight
 
 def test_validate_task_success(bot):
     """Test successful validation of a TaskList object."""
-    message_text = "Name - My Task\nList Name - My Workspace\nWeight - 50"
+    message_text = ("Name - My Task\n"
+                    "Workspace Name - My Workspace\n"
+                    "Weight - 50\n"
+                    "Parent Name - Parent Task\n"
+                    "Description - Some Description\n"
+                    "Completed - Yes")
     message_mock = create_message_mock(message_text)
     task = bot.validate_message(message_mock, Task)
     assert isinstance(task, Task)
     assert task.name == "My Task"
-    assert task.parent_name == "My Workspace"
+    assert task.workspace_name == "My Workspace"
+    assert task.description == "Some Description"
+    assert task.completed == True
+    assert task.parent_name == "Parent Task"
     assert task.weight == 50.0 # Test Weight
 
 def test_validate_task_invalid_weight(bot):
@@ -61,22 +69,22 @@ def test_validate_message_parse_error(bot):
     bot.parse_message = MagicMock(return_value={"error": ValueError("Parsing error")})
 
     with pytest.raises(ValueError, match="Parsing error"):
-        bot.validate_message(message_mock, TaskList)
+        bot.validate_message(message_mock, Task)
 
 def test_baseobject_name_too_long(bot):
     """Test validation failure due to name exceeding max length."""
-    message_text = "Name - " + "A" * 101 + "\nDescription - This is description\nWorkspace Name - Test Workspace"  # Name too long
+    message_text = "Name - " + "A" * 256 + "\nDescription - This is description\nWorkspace Name - Test Workspace"  # Name too long
     message_mock = create_message_mock(message_text)
 
     with pytest.raises(ValidationError) as excinfo:
-        bot.validate_message(message_mock, TaskList)
+        bot.validate_message(message_mock, Task)
 
     assert "Name" in str(excinfo.value)  # check the errors contain the string "Name"
     assert "string" in str(excinfo.value) #check type of exception
 
 def test_task_valid_completed_false(bot):
     """Test successful validation of Task with completed set to False."""
-    message_text = "Name - My Task\nList Name - 123\nCompleted - Нет"
+    message_text = "Name - My Task\nWorkspace Name - 123\nCompleted - Нет"
     message_mock = create_message_mock(message_text)
     task = bot.validate_message(message_mock, Task)
     assert isinstance(task, Task)
@@ -84,7 +92,7 @@ def test_task_valid_completed_false(bot):
 
 def test_task_valid_completed_true(bot):
     """Test successful validation of Task with completed set to True."""
-    message_text = "Name - My Task\nList Name - 123\nCompleted - Да"
+    message_text = "Name - My Task\nWorkspace Name - 123\nCompleted - Да"
     message_mock = create_message_mock(message_text)
     task = bot.validate_message(message_mock, Task)
     assert isinstance(task, Task)

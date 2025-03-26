@@ -1,4 +1,4 @@
-class Messages:
+class Statics:
     MESSAGE_FROM_STATE = {
         "/create_TaskList": "To create a new Task List provide following information:\n"
                            "Change \\_ for valid information.\n"
@@ -24,4 +24,7 @@ class Messages:
                         "Weight - _\n"
                         "Completed - _\n"
                         "```"
+    }
+    COMPONENTS_PROGRESS = {
+
     }

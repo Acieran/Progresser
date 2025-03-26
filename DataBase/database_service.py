@@ -1,9 +1,9 @@
-from typing import Type, Any, Dict, Optional, get_type_hints, List
+from typing import Type, Any, Dict, Optional, get_type_hints, List, Union
 
 from sqlalchemy import create_engine, exc, inspect, select
 from sqlalchemy.orm import Session, DeclarativeMeta, DeclarativeBase, sessionmaker
 
-from .schemas import Base, User, UserState
+from .schemas import Base, User, UserState, Summary
 
 
 class DatabaseService:
@@ -91,7 +91,7 @@ class DatabaseService:
             if own_session:
                 session.close()
 
-    def get_by_custom_fields(self, model: Type[Base], *, session: Optional[Session] = None, **kwargs) -> List[dict]:
+    def get_by_custom_fields(self, model: Type[Base], *, session: Optional[Session] = None, **kwargs) -> List[Summary.all_cls]:
         """
         Retrieves records from the database based on multiple custom fields specified as keyword arguments.
 

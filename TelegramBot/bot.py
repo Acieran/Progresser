@@ -2,7 +2,8 @@ import os
 import logging
 import asyncio
 import re
-from typing import Optional, Dict, Any, Type
+import textwrap
+from typing import Dict, Any, Type
 
 from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
@@ -12,10 +13,9 @@ from dotenv import load_dotenv
 from telebot.async_telebot import AsyncTeleBot
 
 from DataBase.database_service import DatabaseService
-from DataBase.schemas import User as BDUser, Workspace as BDWorkspace, UserState as BDUserState, Task as BDTask, \
-    TaskList as BDTaskList, Workspace as BDWorkspace
+from DataBase.schemas import User as BDUser, UserState as BDUserState, Task as BDTask, Workspace as BDWorkspace
 from resources.pydantic_classes import Task
-from resources.statics import Messages
+from resources.statics import Statics
 
 # --- Configuration ---
 logging.basicConfig(
@@ -245,17 +245,32 @@ class Bot:
             state = self.check_state_and_create(message.chat.username)
             cls, bd_cls, bd_cls_parent = self.CLASS_FROM_STATE[state]
             validated_model_dict = self.validate_message(message, cls).__dict__
-            parent_record = self.database.get_by_custom_fields(bd_cls_parent,
+
+            workspace_record = self.database.get_by_custom_fields(bd_cls_parent,
                                                                owner_name = username,
-                                                               name = validated_model_dict["parent_name"]
+                                                               name = validated_model_dict["workspace_name"]
                                                                )
-            if not parent_record:
+            if not workspace_record:
                 send_additional_error_info = True
-                raise SQLAlchemyError(f"Parent record with Name {validated_model_dict["parent_name"]} in {bd_cls_parent.__name__} doesn't exist")
+                raise SQLAlchemyError(f"Parent record with Name {validated_model_dict["workspace_name"]} in {bd_cls_parent.__name__} doesn't exist")
             else:
-                parent_record = parent_record[0].__dict__
-                del validated_model_dict["parent_name"]
-                validated_model_dict["parent_id"] = parent_record["id"]
+                workspace_record = workspace_record[0].__dict__
+                del validated_model_dict["workspace_name"]
+                validated_model_dict["workspace_id"] = workspace_record["id"]
+
+            if validated_model_dict["parent_name"]:
+                parent_record = self.database.get_by_custom_fields(bd_cls,
+                                                                   owner_name = username,
+                                                                   name = validated_model_dict["parent_name"]
+                                                                   )
+                if not parent_record:
+                    send_additional_error_info = True
+                    raise SQLAlchemyError(f"Parent record with Name {validated_model_dict["parent_name"]} in {bd_cls.__name__} doesn't exist")
+                else:
+                    parent_record = parent_record[0].__dict__
+                    validated_model_dict["parent_id"] = parent_record["id"]
+            del validated_model_dict["parent_name"]
+
             validated_model_dict["owner_name"] = username
             self.database.create(bd_cls, validated_model_dict)
             self.logger.info(f"User {message.chat.username} finished process_something_with_state - successfully\n"
@@ -314,7 +329,7 @@ class Bot:
             state = message.text
             self.logger.info(f"User {username} triggered {message.text}")
             self.set_state(username, state)
-            await self.bot.send_message(message.chat.id, Messages.MESSAGE_FROM_STATE[state])
+            await self.bot.send_message(message.chat.id, Statics.MESSAGE_FROM_STATE[state])
         except SQLAlchemyError:
             self.logger.error(
                 f"Error upon triggering {message.text} with username - {username}. \n Full message - {message}",
@@ -346,22 +361,80 @@ class Bot:
                                              f"Record with name {split_text[2]} in component {split_text[1]} doesn't exist")
             else:
                 record = records[0]
+                record_progress = self._calculate_progress(record)
+                message = f"{Bot.create_telegram_progress_bar(record_progress)}\n"\
+                          f"{record.name}\n"\
+                          f"{textwrap.wrap(record.description, width=100)}"
+                cls = record.__class__
+                child_records = record.child_tasks if cls == BDTask else record.tasks
+                for child in child_records:
+                    progress_bar = Statics.COMPONENTS_PROGRESS[(child.id,child.__class__)]
+                    message += f"    {child.name:<{80}} {progress_bar}"
+                return self.bot.send_message(message.chat.id,message)
+
 
     def _calculate_progress(self, record) -> float:
         cls = record.__class__
-        cls_parent_mapper = {BDWorkspace: BDTaskList,
-                             BDTaskList: BDTask}
-        # rows = self.database.get_by_custom_fields(cls,
-        #                                        name=split_text[2],
-        #                                        owner_name=username)
-        # for row in
-        # sum_completed = 0
-        # sum_all = 0
+        if (record.id,cls) in Statics.COMPONENTS_PROGRESS.keys():
+            return Statics.COMPONENTS_PROGRESS[(record.id, cls)]
+        else:
+            sum_completed = 0
+            sum_all = 0
+            child_records = record.child_tasks if cls == BDTask else record.tasks
+            if not child_records and cls == BDTask:
+                Statics.COMPONENTS_PROGRESS[(record.id,cls)] = record.completed * 100
+                return record.completed * 100
+            for rec in child_records:
+                rec_progress = self._calculate_progress(rec) / 100
+                sum_all += rec.weight
+                if rec.completed:
+                    sum_completed += rec_progress * rec.weight
+            record_progress = sum_completed / sum_all * 100 if sum_all > 0 else 0
+            Statics.COMPONENTS_PROGRESS[(record.id,cls)] = record_progress
+            return record_progress
 
+    @staticmethod
+    def create_progress_bar(progress: float, total_length: int = 10, filled_char: str = "█",
+                            empty_char: str = "░") -> str:
+        """
+        Generates a text-based progress bar.
 
+        Args:
+            progress: A float representing the progress percentage (0.0 to 100.0).
+            total_length: The total length of the progress bar in characters.
+            filled_char: The character to use for the filled portion of the bar.
+            empty_char: The character to use for the empty portion of the bar.
 
+        Returns:
+            A string representing the progress bar.
+        Raises:
+            ValueError: If progress is not a float between 0 and 100.
+        """
+        if not isinstance(progress, (int, float)):
+            raise TypeError("Progress must be a number (int or float)")
 
+        if not 0 <= progress <= 100:
+            raise ValueError("Progress must be between 0 and 100")
 
+        filled_length = int(total_length * progress / 100)
+        bar = filled_char * filled_length + empty_char * (total_length - filled_length)
+        return bar
+
+    @staticmethod
+    def create_telegram_progress_bar(progress: float) -> str:
+        """
+        Creates a Telegram-friendly progress bar using Unicode characters.  Includes
+        percentage.
+
+        Args:
+            progress:  A float representing the progress (0.0 - 100.0)
+
+        Returns:
+            A string representing a Telegram-compatible progress bar
+        """
+        bar = Bot.create_progress_bar(progress, total_length=10)  # Adjust length as needed
+        percentage = f"{progress:.1f}%"  # Format percentage with one decimal place
+        return f"[{bar}] {percentage}"  # Combine bar and percentage
 
     async def start_polling(self):
         self.log("Starting bot polling...")
