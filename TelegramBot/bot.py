@@ -33,6 +33,9 @@ class Bot:
             # "/create_TaskList": (TaskList, BDTaskList, BDWorkspace),
             "/create_Task": (Task, BDTask, BDWorkspace)
         }
+        self.AVAILABLE_CLASSES = {BDWorkspace.__name__: BDWorkspace,
+                             BDTask.__name__: BDTask,
+                             }
         self.bot = AsyncTeleBot(token=token)
         self.cached_state = {}
         self.logger = logging.getLogger(__name__)  # Logger for Bot
@@ -341,25 +344,29 @@ class Bot:
                 exc_info=True)
             await self.bot.send_message(message.chat.id, "There was an error with your request")
 
+    async def _view_all(self, message):
+        username = message.chat.username
+        records = self.database.get_by_custom_fields(self.AVAILABLE_CLASSES[split_text[1]],
+                                                     name=' '.join(split_text[2:]),
+                                                     owner_name=username, session=session)
+
+
     async def _view_something(self, message):
         text = message.text
         username = message.chat.username
-        available_classes = {BDWorkspace.__name__: BDWorkspace,
-                             BDTask.__name__: BDTask,
-                             }
         self.logger.info(f"User {username} triggered _view_something")
         split_text = text.split()
         if len(split_text) < 3:
             await self.bot.send_message(message.chat.id,
                                          "Please specify what you want to view\n"
                                          "Example: /view Workspace Workspace_Name")
-        elif split_text[1] not in available_classes.keys():
+        elif split_text[1] not in self.AVAILABLE_CLASSES.keys():
             await self.bot.send_message(message.chat.id,
                                          "Component not found, please check the spelling"
-                                         f"it should be one of {available_classes.keys()}")
+                                         f"it should be one of {self.AVAILABLE_CLASSES.keys()}")
         else:
             session = self.database.create_session()
-            records = self.database.get_by_custom_fields(available_classes[split_text[1]],
+            records = self.database.get_by_custom_fields(self.AVAILABLE_CLASSES[split_text[1]],
                                                name=' '.join(split_text[2:]),
                                                owner_name=username,session=session)
             if not records:
