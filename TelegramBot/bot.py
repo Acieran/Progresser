@@ -346,9 +346,16 @@ class Bot:
 
     async def _view_all(self, message):
         username = message.chat.username
-        records = self.database.get_by_custom_fields(self.AVAILABLE_CLASSES[split_text[1]],
-                                                     name=' '.join(split_text[2:]),
-                                                     owner_name=username, session=session)
+        # records = self.database.get_by_custom_fields(self.AVAILABLE_CLASSES[split_text[1]],
+        #                                              name=' '.join(split_text[2:]),
+        #                                              owner_name=username, session=session)
+        # keyboard = types.InlineKeyboardMarkup()
+        # for cls in self.AVAILABLE_CLASSES:
+        # # complete_button = types.InlineKeyboardButton(text="Workspace",
+        # #                                              callback_data=f"complete_task:{task_id}")  # Example data
+        # delete_button = types.InlineKeyboardButton(text="Delete", callback_data=f"delete_task:{task_id}")
+        # keyboard.add(complete_button, delete_button)  # Adds the buttons in a row
+        return keyboard
 
 
     async def _view_something(self, message):
