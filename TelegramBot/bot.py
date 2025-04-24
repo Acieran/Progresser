@@ -355,7 +355,7 @@ class Bot:
         # #                                              callback_data=f"complete_task:{task_id}")  # Example data
         # delete_button = types.InlineKeyboardButton(text="Delete", callback_data=f"delete_task:{task_id}")
         # keyboard.add(complete_button, delete_button)  # Adds the buttons in a row
-        return keyboard
+        # return keyboard
 
 
     async def _view_something(self, message):
