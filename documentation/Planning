@@ -1,0 +1,117 @@
+Plan for Telegram bot
+
+1.Core Functionality:
+    Create a new Workspace.
+    Add tasks to a Workspace.
+    Mark tasks as complete.
+    View tasks within a Workspace.
+    Delete/Edit tasks.
+    Delete Workspaces.
+    Show overall progress of a list (percentage complete).
+
+Good, but not necessary features
+    Make nested tasks.
+    Reminders (through Telegram).
+    Make interactable buttons
+
+Future Enhancements:
+    Set due dates for tasks.
+    Set priorities (high, medium, low).
+    Recurring tasks.
+    Sharing lists with others.
+    Tags/Categories for Wokspaces.
+
+2. User Stories:
+    Telegram bot:
+    |---“As a new user of the To-Do List Bot, I want to receive a welcome message with a brief explanation of the bot’s purpose
+    |   and a clear list of available commands (with buttons)”
+    |---"As a user, I want to be able to view my available Workspaces and Tasks(Preferable presented as buttons)
+    |---“As a user, if I have no existing Workspaces or Tasks, I want the bot to inform me clearly that there are none available
+    |   and suggest creating a new one”
+    |---"As a user, I want to be able to create new Workspaces or Task with provided information. Both of them should have a name,
+    |   description, weight of itself(for parent calculation of progress) (Due Date, Priority).
+    |   Tasks should have Status of Completion."
+    |---"As a user, I want to be able to update Workspaces and Tasks and to be able to change any info about it."
+    |---"As a user, I want to have a separate function to mark my tasks as completed"
+    |---"As a user, I want to be able to delete my Workspaces of Tasks"
+
+
+3. Data Model Design:
+    Workspace:
+        id (Integer, Primary Key - auto-incrementing)
+        name (String, required)
+        description (String, optional)
+        tags (Optional, String, for Categories)
+
+    Task:
+        id (Integer, Primary Key - auto-incrementing)
+        workspace_id (Integer, Foreign Key referencing Workspace table)
+        name (String, required)
+        description (String, optional)
+        weight (Integer(1<X<=100), representing the relative importance of the task in progress calculation, default = 1)
+        status (Enum: “Open”, "In progress", “completed”, default="Open")
+        due_date (Date, can be NULL, optional)
+        priority (Enum: “high”, “medium”, “low”, optional)
+        parent_task_id (Integer, Foreign Key referencing Task table - for nested tasks, optional)
+
+    User:
+        username (String, Primary Key - this will be the Telegram user ID)
+        user_state (Enum: "Create, View, Delete")
+        user_context
+
+    User_Workspace:
+        id (Integer, Primary Key - auto-incrementing)
+        workspace_id (Integer, Foreign Key referencing Workspace table)
+        username (Integer, Foreign Key referencing User table)
+        write_permission (Boolean, default = False)
+
+    UserContext:
+        username (Integer, Primary Key, Foreign Key referencing User table)
+        current_workspace_id (Integer, Foreign Key referencing Workspace table, optional)
+        current_task_id (Integer, Foreign Key referencing Task table, optional)
+        last_interaction_time (Timestamp, Optional, Useful for expiring context after a period of inactivity)
+
+
+4. Command Structure & Conversation Flow:
+    Commands:
+        /start - Displays the welcome message and command list. After that states where currently user is and provides
+        options to create a Workspace if None present, or shows a list of accessible commands.
+
+        /create <name>, <?description?>, <?weight?>, <?status?>, <?due_date?>, <?priority?> - Creates a new workspace or task.
+        If in root creates Workspace, else Task. Parses all arguments, if there are errors sends back error info.
+        /create_workspace <name>, <?description?> - Creates a new workspace. Can be done in any place in the system.
+
+        /select - Provides a list of items as buttons or can be typed that a user can view. Can be navigated with buttons
+        forward, backward, if there are two many.
+        /select_workspace - works as select on level 0
+        /. - Go back on the higher level
+
+        /view_detail <parameter> - Send a full representation with progress and other fields and is's children.
+        Parameter can configure how deep nested view goes.
+
+        /update <name>, <?description?>, <?weight?>, <?status?>, <?due_date?>, <?priority?> - same as create, but updates
+        currently selected item.
+
+        /delete - Simply deletes currently selected item and its children
+        /set_status <new_status> - changes status of currently selected item, if applicable
+        /set_priority <priority> - changes the priority, if applicable
+        /set_weight <weight> - changes weight, if applicable
+        /set_due_date <due_date> - changes due_date, if applicable
+        /set_description <description> - changes description
+        /set_name <name> - changes name
+
+        /add_user <username> <write_permission> Allows user to see this workspace(if write permission is True - he can edit it)
+
+        /help - Displays help information.
+
+    Conversation Flows:
+        /start - Available commands(if No Workspace available): (/create, /help)
+
+    Map out how the bot interacts with the user for each command, especially for commands that require multiple inputs
+    (e.g., creating a task, editing a task).
+    Think about:
+        Error Handling: What happens if the user enters invalid data? (e.g., non-numeric weight, invalid date format,
+        workspace ID that doesn’t exist). Provide helpful error messages.
+        Confirmation: For potentially destructive actions (deleting workspaces/tasks), ask for confirmation.
+        State Management: How does the bot “remember” which workspace the user is currently working with
+        (the “selected” workspace)? This could be stored in a session variable or user’s data in the database.

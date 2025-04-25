@@ -12,16 +12,16 @@ from telebot import types
 from dotenv import load_dotenv
 from telebot.async_telebot import AsyncTeleBot
 
-from DataBase.database_service import DatabaseService
-from DataBase.schemas import User as BDUser, UserState as BDUserState, Task as BDTask, Workspace as BDWorkspace
-from resources.pydantic_classes import Task
+from database.database_service import DatabaseService
+from core.models_sql_alchemy.models import User as BDUser, UserState as BDUserState, Task as BDTask, Workspace as BDWorkspace
+from core.schemas_pydantic.schemas import Task
 from resources.statics import Statics
 
 # --- Configuration ---
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO,
-    filename='TelegramBot/bot.log',
+    filename='telegram_bot/bot.log',
     filemode='w',
     encoding='utf-8'
 )

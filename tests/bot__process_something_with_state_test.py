@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 from dotenv import load_dotenv
 
-from DataBase.schemas import Task, Workspace, User
-from TelegramBot.bot import Bot
+from core.models_sql_alchemy.models import Task, Workspace, User
+from telegram_bot.bot import Bot
 
 load_dotenv()
 token = os.getenv('TOKEN')

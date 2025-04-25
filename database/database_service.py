@@ -1,15 +1,15 @@
-from typing import Type, Any, Dict, Optional, get_type_hints, List, Union
+from typing import Type, Any, Dict, Optional, get_type_hints, List
 
 from sqlalchemy import create_engine, exc, inspect, select
-from sqlalchemy.orm import Session, DeclarativeMeta, DeclarativeBase, sessionmaker
+from sqlalchemy.orm import Session, DeclarativeBase, sessionmaker
 
-from .schemas import Base, User, UserState, Summary
+from core.models_sql_alchemy.models import Base, User, UserState, Summary
 
 
-class DatabaseService:
+class SQLDatabaseService:
 
     def __init__(self):
-        self.engine = create_engine("sqlite:///DataBase/progresser.db", echo=True)
+        self.engine = create_engine("sqlite:///database/progresser.db", echo=True)
         Base.metadata.create_all(self.engine)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine, expire_on_commit=False)
 
@@ -97,7 +97,7 @@ class DatabaseService:
             if own_session:
                 session.close()
 
-    def get_by_custom_fields(self, model: Type[Base], *, session: Optional[Session] = None, **kwargs) -> List[Summary.all_cls]:
+    def get_by_custom_fields(self, model: type[Base], *, session: Session | None = None, **kwargs) -> List[Summary.all_cls]:
         """
         Retrieves records from the database based on multiple custom fields specified as keyword arguments.
 

@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 from dotenv import load_dotenv
 
-from TelegramBot.bot import Bot
+from telegram_bot.bot import Bot
 from resources.statics import Statics
 
 load_dotenv()

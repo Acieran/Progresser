@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 from dotenv import load_dotenv
 
-from TelegramBot.bot import Bot
+from telegram_bot.bot import Bot
 
 @pytest.fixture
 def bot():

@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 from dotenv import load_dotenv
 from pydantic import ValidationError
 
-from resources.pydantic_classes import Task
-from TelegramBot.bot import Bot
+from core.schemas_pydantic.schemas import Task
+from telegram_bot.bot import Bot
 
 @pytest.fixture
 def bot():

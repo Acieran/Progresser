@@ -3,8 +3,8 @@ import os
 import pytest
 from dotenv import load_dotenv
 
-from DataBase.schemas import Task
-from TelegramBot.bot import Bot
+from core.models_sql_alchemy.models import Task
+from telegram_bot.bot import Bot
 from resources.statics import Statics
 
 @pytest.fixture

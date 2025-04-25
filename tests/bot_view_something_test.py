@@ -5,9 +5,9 @@ from unittest.mock import MagicMock, AsyncMock
 from dotenv import load_dotenv
 from telebot import types
 
-from DataBase.schemas import Task as BDTask, Workspace as BDWorkspace
-from TelegramBot.bot import Bot
-from DataBase.database_service import DatabaseService
+from core.models_sql_alchemy.models import Task as BDTask, Workspace as BDWorkspace
+from telegram_bot.bot import Bot
+from database.database_service import DatabaseService
 from resources.statics import Statics
 
 
