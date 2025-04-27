@@ -1,9 +1,7 @@
-from typing import Type, Any, Dict, Optional, get_type_hints, List
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
-from sqlalchemy import create_engine, exc, inspect, select
-from sqlalchemy.orm import Session, DeclarativeBase, sessionmaker
-
-from core.models_sql_alchemy.models import Base, User, UserState, Summary
+from core.models_sql_alchemy.models import Base
 
 
 class SQLDatabaseManager:
@@ -15,6 +13,9 @@ class SQLDatabaseManager:
 
     def get_session(self):
         return self.SessionLocal()
+
+    def get_new_session(self):
+        return sessionmaker(autocommit=False, autoflush=False, bind=self.engine, expire_on_commit=False)
 
     def session_context(self) -> Session:
         """Context manager for automatic session handling"""
