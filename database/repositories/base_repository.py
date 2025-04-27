@@ -11,6 +11,7 @@ class BaseRepository:
     def __init__(self, db_manager: SQLDatabaseManager):
         self.db_manager = db_manager
         self._session: Session | None = None
+        self.model: type | None = None
 
     def transaction(self):
         """Use this when you need multi-operation transactions"""
@@ -45,30 +46,22 @@ class BaseRepository:
             self.repository._session = None
 
     @transaction_decorator
-    def create(self, model: type, **kwargs) -> True:
+    def create(self, **kwargs) -> True:
         """Creates a new record in the database."""
         try:
-            instance = model(**kwargs)
+            instance = self.model(**kwargs)
             self._session.add(instance)
             return True
         except exc.SQLAlchemyError as e:
             raise e
 
-
-    def get_by_id(self, model: type, item_id, session: Session | None = None) -> True:
+    @transaction_decorator
+    def get_by_id(self, item_id: str | int) -> True:
         """Retrieves a record by its primary key (assuming id)."""
-        own_session = False
         try:
-            if session is None:
-                session = self.SessionLocal()
-                own_session = True
-
-            return session.get(model, item_id)
+            return self._session.get(self.model, item_id)
         except exc.SQLAlchemyError as e:
             raise e
-        finally:
-            if own_session:
-                session.close()
 
     def get_by_custom_field(self, model: type[DeclarativeBase], field_name: str, field_value, session: Session | None = None) -> True:
         """
