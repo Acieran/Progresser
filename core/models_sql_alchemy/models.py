@@ -36,6 +36,13 @@ class User(Base):
     def __repr__(self) -> str:
         return f"Username(id={self.username!r}, Active={self.active!r}, Chat_id={self.telegram_username!r})"
 
+    def object_to_dict(self) -> dict:
+        result = {}
+        for attribute in {"username", "active", "telegram_username"}:
+            if self.__getattribute__(attribute) is not None:
+                result[attribute] = getattr(self, attribute)
+        return result
+
 class UserState(Base):
     __tablename__ = "user_state"
     telegram_username: Mapped[str] = mapped_column(ForeignKey("users.telegram_username"), primary_key=True)

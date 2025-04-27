@@ -7,7 +7,7 @@ from telebot import types
 
 from core.models_sql_alchemy.models import Task as BDTask, Workspace as BDWorkspace
 from telegram_bot.bot import Bot
-from database.database_service import DatabaseService
+from database.database_manager import DatabaseService
 from resources.statics import Statics
 
 

@@ -12,7 +12,7 @@ from telebot import types
 from dotenv import load_dotenv
 from telebot.async_telebot import AsyncTeleBot
 
-from database.database_service import DatabaseService
+from database.database_manager import DatabaseService
 from core.models_sql_alchemy.models import User as BDUser, UserState as BDUserState, Task as BDTask, Workspace as BDWorkspace
 from core.schemas_pydantic.schemas import Task
 from resources.statics import Statics

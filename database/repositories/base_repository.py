@@ -1,46 +1,61 @@
-from typing import Type, Any, Dict, Optional, get_type_hints, List
+from typing import get_type_hints
 
-from sqlalchemy import create_engine, exc, inspect, select
-from sqlalchemy.orm import Session, DeclarativeBase, sessionmaker
+from sqlalchemy import exc, inspect, select
+from sqlalchemy.orm import Session, DeclarativeBase
 
-from core.models_sql_alchemy.models import Base, User, UserState, Summary
+from database.database_manager import SQLDatabaseManager
 
 
-class SQLDatabaseService:
 
-    def __init__(self):
-        self.engine = create_engine("sqlite:///database/progresser.db", echo=True)
-        Base.metadata.create_all(self.engine)
-        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine, expire_on_commit=False)
+class BaseRepository:
+    def __init__(self, db_manager: SQLDatabaseManager):
+        self.db_manager = db_manager
+        self._session: Session | None = None
 
-    def create_session(self):
-        return self.SessionLocal()
+    def transaction(self):
+        """Use this when you need multi-operation transactions"""
+        return self._TransactionHelper(self)
 
-    def close_session(self, session: Session):
-        session.close()
+    @staticmethod
+    def transaction_decorator(func):
+        def wrapper(self, model, *args, **kwargs):
+            if self._session is None:
+                with self.transaction():
+                    return func(self, model, *args, **kwargs)
+            else:
+                return func(*args, **kwargs)
+        return wrapper
 
-    def create(self, model: Type, data: Dict[str, Any], session: Optional[Session] = None) -> Any:
+    class _TransactionHelper:
+        def __init__(self, repository):
+            self.repository = repository
+
+        def __enter__(self):
+            # Start a new session if none exists
+            if self.repository._session is None:
+                self.repository._session = self.repository.db_manager.get_session()
+            return self.repository
+
+        def __exit__(self, exc_type, _, __):
+            if exc_type is None:
+                self.repository._session.commit()
+            else:
+                self.repository._session.rollback()
+            self.repository._session.close()
+            self.repository._session = None
+
+    @transaction_decorator
+    def create(self, model: type, **kwargs) -> True:
         """Creates a new record in the database."""
-        own_session = False
         try:
-            if session is None:
-                session = self.SessionLocal()
-                own_session = True
-
-            instance = model(**data)  # Create an instance of the model
-            session.add(instance)
-            session.commit()
-            session.refresh(instance)  # Get the updated object
-            return instance
+            instance = model(**kwargs)
+            self._session.add(instance)
+            return True
         except exc.SQLAlchemyError as e:
-            session.rollback()
             raise e
-        finally:
-            if own_session:
-                session.close()
 
 
-    def get_by_id(self, model: Type, item_id: Any, session: Session | None = None) -> Optional[Any]:
+    def get_by_id(self, model: type, item_id, session: Session | None = None) -> True:
         """Retrieves a record by its primary key (assuming id)."""
         own_session = False
         try:
@@ -55,7 +70,7 @@ class SQLDatabaseService:
             if own_session:
                 session.close()
 
-    def get_by_custom_field(self, model: Type[DeclarativeBase], field_name: str, field_value: Any, session: Optional[Session] = None) -> Optional[Any]:
+    def get_by_custom_field(self, model: type[DeclarativeBase], field_name: str, field_value, session: Session | None = None) -> True:
         """
         Retrieves a record from the database based on a custom field name and value.
 
@@ -97,7 +112,7 @@ class SQLDatabaseService:
             if own_session:
                 session.close()
 
-    def get_by_custom_fields(self, model: type[Base], *, session: Session | None = None, **kwargs) -> List[Summary.all_cls]:
+    def get_by_custom_fields(self, model: type[DeclarativeBase], *, session: Session | None = None, **kwargs) -> list:
         """
         Retrieves records from the database based on multiple custom fields specified as keyword arguments.
 
@@ -134,7 +149,7 @@ class SQLDatabaseService:
                 session.close()
 
 
-    def update(self, model: Type, item_id: Any, data: Dict[str, Any], session: Optional[Session] = None) -> Optional[Any]:
+    def update(self, model: type, item_id, data: dict[str, object], session: Session | None = None) -> True:
         """Updates a record in the database."""
         own_session = False
         try:
@@ -157,7 +172,7 @@ class SQLDatabaseService:
                 session.close()
 
 
-    def delete(self, model: Type, item_id: Any, session: Optional[Session] = None) -> bool:
+    def delete(self, model: type, item_id, session: Session | None = None) -> bool:
         """Deletes a record from the database."""
         own_session = False
         try:
@@ -177,7 +192,7 @@ class SQLDatabaseService:
             if own_session:
                 session.close()
 
-    def create_user(self, username: str) -> Any:
+    def create_user(self, username: str):
         """Creates a new record in the database."""
         try:
             self.create(User, {'username': username, 'telegram_username': username})
@@ -185,7 +200,7 @@ class SQLDatabaseService:
         except exc.SQLAlchemyError as e:
             raise e
 
-    def get_all(self, model:Type, session: Optional[Session] = None) -> Any:
+    def get_all(self, model:type, session: Session | None = None):
         own_session = False
         try:
             if session is None:
@@ -200,7 +215,7 @@ class SQLDatabaseService:
             if own_session:
                 session.close()
 
-    def get_user_state(self, telegram_username: str, session: Optional[Session] = None) -> Any:
+    def get_user_state(self, telegram_username: str, session: Session | None = None):
         own_session = False
         try:
             if session is None:
