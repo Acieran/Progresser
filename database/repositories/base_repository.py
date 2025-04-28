@@ -16,6 +16,9 @@ class BaseRepository:
         """Use this when you need multi-operation transactions"""
         return self._TransactionHelper(self)
 
+    def get_session(self) -> Session:
+        return self._session
+
     @staticmethod
     def transaction_decorator(func):
         def wrapper(self, model, *args, **kwargs):
