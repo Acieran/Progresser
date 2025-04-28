@@ -1,16 +1,16 @@
-from typing import get_type_hints
+from typing import get_type_hints, TypeVar
 
 from sqlalchemy import exc, inspect, select
 from sqlalchemy.orm import Session, DeclarativeBase
 
 from database.database_manager import SQLDatabaseManager
 
+T = TypeVar('T', bound=DeclarativeBase)
 
 class BaseRepository:
     def __init__(self, db_manager: SQLDatabaseManager):
         self.db_manager = db_manager
         self._session: Session | None = None
-        self.model: type | None = None
 
     def transaction(self):
         """Use this when you need multi-operation transactions"""
@@ -45,29 +45,30 @@ class BaseRepository:
             self.repository._session = None
 
     @transaction_decorator
-    def create(self, **kwargs) -> True:
+    def create(self, model: type[DeclarativeBase], **kwargs) -> True:
         """Creates a new record in the database."""
         try:
-            instance = self.model(**kwargs)
+            instance = model(**kwargs)
             self._session.add(instance)
             return True
         except exc.SQLAlchemyError as e:
             raise e
 
     @transaction_decorator
-    def get_by_id(self, item_id: str | int) -> True:
+    def get_by_id(self, model: type[T], item_id: str | int) -> T | None:
         """Retrieves a record by its primary key (assuming id)."""
         try:
-            return self._session.get(self.model, item_id)
+            return self._session.get(model, item_id)
         except exc.SQLAlchemyError as e:
             raise e
 
     @transaction_decorator
-    def get_by_custom_field(self, field_name: str, field_value) -> True:
+    def get_by_custom_field(self, model: type[DeclarativeBase], field_name: str, field_value) -> type[DeclarativeBase]:
         """
         Retrieves a record from the database based on a custom field name and value.
 
         Args:
+            model: The name of model to find record in.
             field_name: The name of the field to filter on (as a string).
             field_value: The value to filter the field by.
 
@@ -78,24 +79,25 @@ class BaseRepository:
             ValueError: If the field_name is not a valid attribute of the model.
             TypeError: If model is not a valid SQLAlchemy model.
         """
-        if not isinstance(self.model, type) or not issubclass(self.model, DeclarativeBase):
+        if not isinstance(model, type) or not issubclass(model, DeclarativeBase):
             raise TypeError(f"model must be a SQLAlchemy model class (DeclarativeBase)")
 
-        inspector = inspect(self.model)
+        inspector = inspect(model)
         attribute_names = [c.key for c in inspector.mapper.column_attrs]
 
         if field_name not in attribute_names:
             raise ValueError(f"Invalid field_name: '{field_name}'.  Valid fields are: {attribute_names}")
 
         try:
-            attribute = getattr(self.model, field_name)
-            result = self._session.query(self.model).filter(attribute == field_value).first()
+            attribute = getattr(model, field_name)
+            result = self._session.query(model).filter(attribute == field_value).first()
             return result
 
         except exc.SQLAlchemyError as e:
              raise e
+
     @transaction_decorator
-    def get_by_custom_fields(self, **kwargs) -> list:
+    def get_by_custom_fields(self, model: type[DeclarativeBase], **kwargs) -> list[type[DeclarativeBase]]:
         """
         Retrieves records from the database based on multiple custom fields specified as keyword arguments.
 
@@ -109,11 +111,11 @@ class BaseRepository:
             A list of records that match the specified search criteria.
         """
         try:
-            query = select(self.model)
+            query = select(model)
             for field, value in kwargs.items():
-                column = getattr(self.model, field, None)  # Get the column object from the model
+                column = getattr(model, field, None)  # Get the column object from the model
                 if column is None:
-                    raise ValueError(f"Model '{self.model.__name__}' has no attribute '{field}'")
+                    raise ValueError(f"Model '{model.__name__}' has no attribute '{field}'")
                 query = query.where(column == value)
 
             # Execute the query and return the results
@@ -124,13 +126,13 @@ class BaseRepository:
              raise e
 
     @transaction_decorator
-    def update(self, item_id, data: dict[str, object]) -> True:
+    def update(self, model:type[DeclarativeBase], item_id, data: dict[str, object]) -> True:
         """Updates a record in the database."""
         try:
-            instance = self._session.get(self.model, item_id)
+            instance = self._session.get(model, item_id)
             if instance:
                 for key, value in data.items():
-                    if hasattr(instance, key) and key in get_type_hints(self.model):  # Check for valid fields
+                    if hasattr(instance, key) and key in get_type_hints(model):  # Check for valid fields
                         setattr(instance, key, value)
                 self._session.commit()
                 self._session.refresh(instance)
@@ -139,10 +141,10 @@ class BaseRepository:
             raise e
 
     @transaction_decorator
-    def delete(self, item_id) -> bool:
+    def delete(self, model: type[DeclarativeBase], item_id) -> True:
         """Deletes a record from the database."""
         try:
-            instance = self.get_by_id(self.model, item_id)
+            instance = self.get_by_id(model, item_id)
             if instance:
                 self._session.delete(instance)
                 self._session.commit()
@@ -152,9 +154,9 @@ class BaseRepository:
             raise e
 
     @transaction_decorator
-    def get_all(self):
+    def get_all(self, model: type[DeclarativeBase]) -> list[type[DeclarativeBase]]:
         try:
-            result = self._session.query(self.model).all()
+            result = self._session.query(model).all()
             return result
         except exc.SQLAlchemyError as e:
             raise e
