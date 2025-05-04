@@ -1,14 +1,18 @@
-from typing import List, Union
-from typing import Optional
-from sqlalchemy import ForeignKey, Boolean, Integer, Float
-from sqlalchemy import String
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import mapped_column
-from sqlalchemy.orm import relationship
+from typing import Any, List, Optional, Union
+
+from sqlalchemy import Boolean, Float, ForeignKey, String, inspect
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
 
 class Base(DeclarativeBase):
-    pass
+    def to_dict(self) -> dict[str, Any]:
+        """Convert model to dictionary, optionally excluding relationships."""
+        mapper = inspect(self.__class__)
+        result = {}
+
+        for column in mapper.columns:
+            result[column.name] = getattr(self, column.name)
+        return result
 
 class Workspace(Base):
     __tablename__ = "workspaces"
@@ -35,13 +39,6 @@ class User(Base):
     )
     def __repr__(self) -> str:
         return f"Username(id={self.username!r}, Active={self.active!r}, Chat_id={self.telegram_username!r})"
-
-    def object_to_dict(self) -> dict:
-        result = {}
-        for attribute in {"username", "active", "telegram_username"}:
-            if self.__getattribute__(attribute) is not None:
-                result[attribute] = getattr(self, attribute)
-        return result
 
 class UserState(Base):
     __tablename__ = "user_state"
