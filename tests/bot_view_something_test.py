@@ -1,14 +1,15 @@
 import os
-import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from dotenv import load_dotenv
 from telebot import types
 
-from core.models_sql_alchemy.models import Task as BDTask, Workspace as BDWorkspace
-from telegram_bot.bot import Bot
+from core.models_sql_alchemy.models import Task as BDTask
+from core.models_sql_alchemy.models import Workspace as BDWorkspace
 from database.database_manager import DatabaseService
 from resources.statics import Statics
+from telegram_bot.bot import Bot
 
 
 @pytest.fixture

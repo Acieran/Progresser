@@ -4,8 +4,9 @@ import pytest
 from dotenv import load_dotenv
 
 from core.models_sql_alchemy.models import Task
-from telegram_bot.bot import Bot
 from resources.statics import Statics
+from telegram_bot.bot import Bot
+
 
 @pytest.fixture
 def bot():

@@ -3,6 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+
 class States(str, Enum):
     none = None
     creating_workspace = "creating workspace"

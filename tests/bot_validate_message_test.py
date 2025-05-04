@@ -1,13 +1,13 @@
 import os
-
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
 from dotenv import load_dotenv
 from pydantic import ValidationError
 
 from core.schemas_pydantic.schemas import Task
 from telegram_bot.bot import Bot
+
 
 @pytest.fixture
 def bot():

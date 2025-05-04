@@ -1,0 +1,25 @@
+[tool.ruff]
+# Enable Flake8 + isort + some Pylint rules
+lint.select = [
+  "E",   # Pyflakes errors
+  "F",   # Pyflakes fixes
+  "W",   # PEP 8 warnings
+  "I",   # isort (import sorting)
+  "UP",  # pyupgrade (modern Python syntax)
+  "PL",
+]
+lint.ignore = ["E501"]  # Ignore line length (if using Black)
+line-length = 120   # Match Black's default
+
+# Auto-fix unsafe fixes (e.g., unused imports)
+lint.fixable = ["F401", "I001"]
+lint.unfixable = []
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+#warn_return_any = true
+#warn_unused_configs = true
+#disallow_untyped_defs = true
+#check_untyped_defs = true
+#no_implicit_optional = true

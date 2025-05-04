@@ -1,12 +1,11 @@
 import os
-
-import pytest
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from dotenv import load_dotenv
 
-from telegram_bot.bot import Bot
 from resources.statics import Statics
+from telegram_bot.bot import Bot
 
 load_dotenv()
 token = os.getenv('TOKEN')
