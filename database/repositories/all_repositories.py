@@ -2,8 +2,8 @@ from typing import Literal
 
 from sqlalchemy import exc
 
-from core.models_sql_alchemy.models import User, UserState
-from database.repositories.base_repository import BaseRepository
+from infrastructure.persistance.sqlalchemy.models import User, UserState
+from infrastructure.persistance.sqlalchemy.base_repository import BaseRepository
 
 
 class UserRepository(BaseRepository):

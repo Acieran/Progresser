@@ -1,48 +1,34 @@
 tasktracker/
-├── core/
-│   ├── domain/               # Pure business models
-│   │   ├── task.py           # Task with progress logic
-│   │   ├── task_list.py      # TaskList with completion %
-│   │   └── user.py           # User domain model
+├── core/                   # Strictly business logic - NO framework/db dependencies
+│   ├── domain/             # Pure business entities (no ORM, no serialization)
+│   │   ├── task.py         # Task entity with progress calculation methods
+│   │   ├── workspace.py    # Workspace entity with validation rules
+│   │   ├── user.py         # User management logic
+│   │   └── user_state.py   # State transition logic (business rules)
 │   │
-│   ├── services/
-│   │   ├── task_service.py   # Core progress logic
-│   │   ├── analytics.py      # Progress calculations
-│   │   └── notification.py   # Progress alerts
-│   │
-│   └── schemas/
-│       └── shared/          # Pydantic Schemas
-│           ├── task.py      # e.g., TaskBase, TaskProgress
-│           └── user.py     # e.g., UserPublic
+│   └── application/        # Business use cases
+│       ├── tasks/          # Task management flows
+│       ├── analytics/      # Progress calculation services
+│       └── ports/          # Abstract interfaces (Repository, StateStore, Notifier)
 │
-├── interfaces/
-│   ├── telegram/
-│   │   ├── handlers/
-│   │   │   ├── tasks.py     # Task commands
-│   │   │   └── progress.py  # Progress reports
-│   │   ├── schemas/          # Bot-specific
-│   │   │   ├── commands.py   # /addtask {task_name} {due_date}
-│   │   │   └── replies.py    # Progress bars as MarkdownV2
-│   │   └── bot.py
+├── interfaces/             # Delivery mechanisms (adapters)
+│   ├── telegram/           # Telegram-specific implementation
+│   │   ├── handlers/       # Command handlers
+│   │   ├── presenters/     # Markdown formatting
+│   │   └── schemas/        # Telegram-specific DTOs
 │   │
-│   ├── api/
-│   │   ├── schemas/          # FastAPI-specific
-│   │   │   ├── tasks.py      # JSON request/response
-│   │   │   └── progress.py   # % as float, nested tasks
-│   │
-│   └── web/                  # Future
-│       └── schemas/          # Web-specific forms/UI models
+│   └── api/                # Future FastAPI
+│       ├── routes/         # API endpoints
+│       └── schemas/        # OpenAPI schemas
 │
-├── db/
-│   ├── sql/                 # SQL database
-│   │   ├── models/          # SQLAlchemy models
-│   │   └── repositories/
+├── infrastructure/         # Implementation details
+│   ├── persistence/        # DB implementations
+│   │   ├── sqlalchemy/     # SQL models/repos
+│   │   └── redis/          # Redis state store
 │   │
-│   └── redis/               # Redis for caching
-│       ├── models/          # Redis data structures
-│       └── repositories/
+│   ├── services/           # External service integrations
+│   └── config/             # Environment configuration
 │
-└── infrastructure/
-    ├── config.py
-    ├── di.py                # Dependency injection
-    └── logging.py
+└── shared/                 # Cross-cutting concerns
+    ├── schemas/            # Common DTOs (base classes)
+    └── utils/              # Shared utilities

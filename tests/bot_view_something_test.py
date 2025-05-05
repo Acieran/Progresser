@@ -5,9 +5,9 @@ import pytest
 from dotenv import load_dotenv
 from telebot import types
 
-from core.models_sql_alchemy.models import Task as BDTask
-from core.models_sql_alchemy.models import Workspace as BDWorkspace
-from database.database_manager import DatabaseService
+from infrastructure.persistance.sqlalchemy.models import Task as BDTask
+from infrastructure.persistance.sqlalchemy.models import Workspace as BDWorkspace
+from infrastructure.persistance.redis.caching_database_manager import DatabaseService
 from resources.statics import Statics
 from telegram_bot.bot import Bot
 

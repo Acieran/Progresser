@@ -3,7 +3,7 @@ import os
 import pytest
 from dotenv import load_dotenv
 
-from core.models_sql_alchemy.models import Task
+from infrastructure.persistance.sqlalchemy.models import Task
 from resources.statics import Statics
 from telegram_bot.bot import Bot
 

@@ -11,12 +11,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from telebot import types
 from telebot.async_telebot import AsyncTeleBot
 
-from core.models_sql_alchemy.models import Task as BDTask
-from core.models_sql_alchemy.models import User as BDUser
-from core.models_sql_alchemy.models import UserState as BDUserState
-from core.models_sql_alchemy.models import Workspace as BDWorkspace
-from core.schemas_pydantic.schemas import Task
-from database.database_manager import DatabaseService
+from infrastructure.persistance.sqlalchemy.models import Task as BDTask
+from infrastructure.persistance.sqlalchemy.models import User as BDUser
+from infrastructure.persistance.sqlalchemy.models import UserState as BDUserState
+from infrastructure.persistance.sqlalchemy.models import Workspace as BDWorkspace
+from interfaces.shared.schemas import Task
+from infrastructure.persistance.redis.caching_database_manager import DatabaseService
 from resources.statics import Statics
 
 # --- Configuration ---

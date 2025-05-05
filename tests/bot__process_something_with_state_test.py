@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from dotenv import load_dotenv
 
-from core.models_sql_alchemy.models import Task, User, Workspace
+from infrastructure.persistance.sqlalchemy.models import Task, User, Workspace
 from telegram_bot.bot import Bot
 
 load_dotenv()

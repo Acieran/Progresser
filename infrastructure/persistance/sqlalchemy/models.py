@@ -48,24 +48,6 @@ class UserState(Base):
     def __repr__(self) -> str:
         return f"UserState(id={self.telegram_username!r}, State={self.state!r})"
 
-# class TaskList(Base):
-#     __tablename__ = "lists"
-#     id: Mapped[int] = mapped_column(primary_key=True)
-#     workspace: Mapped["Workspace"] = relationship(
-#         back_populates="task_lists",
-#         foreign_keys="[TaskList.parent_id]"
-#     )
-#     parent_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"))
-#     name: Mapped[str] = mapped_column(String(255), nullable=True)
-#     description: Mapped[Optional[str]] = mapped_column(String(5000), nullable=True)
-#     progress: Mapped[float] = mapped_column(Float, nullable=True)
-#     weight: Mapped[float] = mapped_column(Float, default=1)
-#     owner_name: Mapped[str] = mapped_column(ForeignKey("users.username"))
-#     tasks: Mapped[List["Task"]] = relationship(back_populates="list", cascade="all, delete-orphan")
-#     def __repr__(self) -> str:
-#         return (f"TaskList(id={self.id!r}, Workspace_name={self.parent_id!r}, Name={self.name!r}, "
-#                 f"Description={self.description!r}, Progress={self.progress!r}, Weight={self.weight!r})")
-
 class Task(Base):
     __tablename__ = "tasks"
     id: Mapped[int] = mapped_column(primary_key=True)

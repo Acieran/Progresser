@@ -7,18 +7,20 @@ from sqlalchemy import inspect as sqlalchemy_inspect
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from core.models_sql_alchemy.models import Base
-from database.database_manager import RedisDatabaseManager, SQLDatabaseManager
+from core.application.ports.caching import CachingInterface
+from core.application.ports.database import DatabaseInterface
+from core.application.ports.repositories import BaseRepositoryInterface
+from infrastructure.persistance.sqlalchemy.models import Base
 
 T = TypeVar('T', bound=Base)
 F = TypeVar('F', bound=Callable[..., Any])
 
-class BaseRepository:
+class BaseRepository(BaseRepositoryInterface, CachingInterface):
     """
     Repository that initialized basic database operations(CRUD)
     and transaction handling.
     """
-    def __init__(self, db_manager: SQLDatabaseManager, redis_db_manager: RedisDatabaseManager):
+    def __init__(self, db_manager: DatabaseInterface, redis_db_manager: CachingInterface):
         self.db_manager = db_manager
         self._session: Session | None = None
         self.redis_db_manager = redis_db_manager
@@ -54,7 +56,7 @@ class BaseRepository:
         return cast(F, wrapper)
 
     @staticmethod
-    def caching(func: F) -> F:
+    def cache(func: F) -> F:
         """
         decorator for caching on methods that return data
         """
@@ -105,7 +107,7 @@ class BaseRepository:
             session.close()
             self.repository._session = None
 
-    def _invalidate_caches(
+    def _invalidate_cache(
             self,
             model: str,
             *cache_names: str,
@@ -121,7 +123,7 @@ class BaseRepository:
         try:
             instance = model(**kwargs)
             self._ensure_session().add(instance)
-            self._invalidate_caches(model.__name__.lower(), "get_all", "get_by_custom_fields")
+            self._invalidate_cache(model.__name__.lower(), "get_all", "get_by_custom_fields")
             return True
         except exc.SQLAlchemyError as e:
             raise e
@@ -130,7 +132,7 @@ class BaseRepository:
         redis_conn = self.redis_db_manager.get_connection()
         redis_conn.delete(f"get_by_id:{model}:item_id:{item_id}")
 
-    @caching
+    @cache
     @transaction_decorator
     def get_by_id(self, model: type[T], item_id: str | int) -> dict[str,Any] | None:
         """Retrieves a record by its primary key (assuming id)."""
@@ -142,7 +144,7 @@ class BaseRepository:
         except exc.SQLAlchemyError as e:
             raise e
 
-    @caching
+    @cache
     @transaction_decorator
     def get_by_custom_field(self,
                             model: type[T],
@@ -189,7 +191,7 @@ class BaseRepository:
         if len(keys_to_del_bin):
             redis_conn.delete(*keys_to_del_bin)
 
-    @caching
+    @cache
     @transaction_decorator
     def get_by_custom_fields(self, model: type[Base], **kwargs: Any) -> list[dict[str, Any]]:
         """
@@ -230,7 +232,7 @@ class BaseRepository:
                 for key, value in data.items():
                     if hasattr(instance, key) and key in get_type_hints(model):
                         setattr(instance, key, value)
-                self._invalidate_caches(
+                self._invalidate_cache(
                     model.__name__.lower(),
                     "get_all", "get_by_custom_fields", "get_by_id",
                     item_id=item_id
@@ -248,7 +250,7 @@ class BaseRepository:
             instance = session.get(model, item_id)
             if instance:
                 session.delete(instance)
-                self._invalidate_caches(
+                self._invalidate_cache(
                     model.__name__.lower(),
                     "get_all", "get_by_custom_fields", "get_by_id",
                     item_id=item_id
@@ -262,7 +264,7 @@ class BaseRepository:
         redis_conn = self.redis_db_manager.get_connection()
         redis_conn.delete(f"get_all:{model}")
 
-    @caching
+    @cache
     @transaction_decorator
     def get_all(self, model: type[Base]) -> list[dict[str, Any]]:
         """Returns all records of the database table"""
