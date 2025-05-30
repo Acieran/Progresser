@@ -8,9 +8,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from core.application.ports.caching import CachingInterface
-from core.application.ports.database import DatabaseInterface
 from core.application.ports.repositories import BaseRepositoryInterface
+from infrastructure.persistance.redis.caching_database_manager import CachingDatabaseManager
 from infrastructure.persistance.sqlalchemy.models import Base
+from infrastructure.persistance.sqlalchemy.sql_database_manager import SQLDatabaseManager
 
 T = TypeVar('T', bound=Base)
 F = TypeVar('F', bound=Callable[..., Any])
@@ -20,7 +21,7 @@ class BaseRepository(BaseRepositoryInterface, CachingInterface):
     Repository that initialized basic database operations(CRUD)
     and transaction handling.
     """
-    def __init__(self, db_manager: DatabaseInterface, redis_db_manager: CachingInterface):
+    def __init__(self, db_manager: SQLDatabaseManager, redis_db_manager: CachingDatabaseManager):
         self.db_manager = db_manager
         self._session: Session | None = None
         self.redis_db_manager = redis_db_manager

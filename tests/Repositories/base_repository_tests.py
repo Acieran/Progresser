@@ -2,15 +2,16 @@ import pytest
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from infrastructure.persistance.sqlalchemy.models import Base, User
-from infrastructure.persistance.redis.caching_database_manager import RedisDatabaseManager, SQLDatabaseManager
 from infrastructure.persistance.sqlalchemy.base_repository import BaseRepository
+from infrastructure.persistance.redis.caching_database_manager import CachingDatabaseManager
+from infrastructure.persistance.sqlalchemy.sql_database_manager import SQLDatabaseManager
 
 sql_string = "sqlite:///:memory:"
 
 @pytest.fixture
 def repository():
     manager = SQLDatabaseManager(sql_string)
-    repository = BaseRepository(manager, RedisDatabaseManager())
+    repository = BaseRepository(manager, CachingDatabaseManager())
     yield repository
     Base.metadata.drop_all(manager.engine)
 
@@ -105,10 +106,14 @@ def test_get_by_id_not_exists(repository):
 def test_get_by_id_transactional_success(repository):
     user = User(username="Acie1", active=True, telegram_username="Acie1")
 
+
+
     with repository.transaction():
         repository.create(User, **user.to_dict())
-        user_from_db = repository.get_by_id(User, user.username)
+        user_from_db = repository.db_manager.get_session().get(User, user.username)
         assert user_from_db is None
+        user_from_db = repository.get_by_id(User, user.username)
+        assert user.to_dict() == user_from_db
 
     user_from_db = repository.get_by_id(User, user.username)
     assert user.to_dict() == user_from_db
@@ -167,6 +172,7 @@ def test_get_all_success(repository):
     users_from_db = repository.get_all(User)
 
     assert [user1.to_dict(), user2.to_dict()] == users_from_db
+
 
 def test_get_all_failure(repository):
     users_from_db = repository.get_all(User)
