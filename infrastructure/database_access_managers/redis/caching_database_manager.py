@@ -1,9 +1,9 @@
 import redis
 
-from core.application.ports.database import CacheInterface
+from core.application.ports.database import CacheDBConnectionInterface
 
 
-class CachingDatabaseManager(CacheInterface):
+class CachingDatabaseManager(CacheDBConnectionInterface):
     def __init__(self,
                  host : str ='localhost',
                  port: int = 6379,

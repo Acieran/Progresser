@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 from dotenv import load_dotenv
 
-from telegram_bot.bot import Bot
+from presentation.telegram_bot.bot import Bot
 
 
 @pytest.fixture

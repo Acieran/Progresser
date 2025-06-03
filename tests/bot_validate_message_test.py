@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from pydantic import ValidationError
 
 from interfaces.shared.schemas import Task
-from telegram_bot.bot import Bot
+from presentation.telegram_bot.bot import Bot
 
 
 @pytest.fixture

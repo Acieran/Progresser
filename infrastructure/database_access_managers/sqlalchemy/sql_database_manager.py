@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from core.application.ports.database import DatabaseInterface
-from infrastructure.persistance.sqlalchemy.models import Base
+from infrastructure.database_access_managers.sqlalchemy.models import Base
 
 
 class SQLDatabaseManager(DatabaseInterface):

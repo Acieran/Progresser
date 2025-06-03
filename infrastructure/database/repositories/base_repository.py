@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 
 from core.application.ports.caching import CachingInterface
 from core.application.ports.repositories import BaseRepositoryInterface
-from infrastructure.persistance.redis.caching_database_manager import CachingDatabaseManager
-from infrastructure.persistance.sqlalchemy.models import Base
-from infrastructure.persistance.sqlalchemy.sql_database_manager import SQLDatabaseManager
+from infrastructure.database_access_managers.redis.caching_database_manager import CachingDatabaseManager
+from infrastructure.database_access_managers.sqlalchemy.models import Base
+from infrastructure.database_access_managers.sqlalchemy.sql_database_manager import SQLDatabaseManager
 
 T = TypeVar('T', bound=Base)
 F = TypeVar('F', bound=Callable[..., Any])

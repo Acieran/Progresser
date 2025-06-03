@@ -3,9 +3,9 @@ import os
 import pytest
 from dotenv import load_dotenv
 
-from infrastructure.persistance.sqlalchemy.models import Task
+from infrastructure.database_access_managers.sqlalchemy.models import Task
 from resources.statics import Statics
-from telegram_bot.bot import Bot
+from presentation.telegram_bot.bot import Bot
 
 
 @pytest.fixture

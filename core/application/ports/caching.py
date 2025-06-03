@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import TypeVar, Callable, Any
 
+from core.application.ports.database import CacheDBConnectionInterface
+
 F = TypeVar('F', bound=Callable[..., Any])
 
 class CachingInterface(ABC):
@@ -24,3 +26,12 @@ class CachingInterface(ABC):
 
     @abstractmethod
     def _get_all_cache_invalidation(self, model: str) -> None: ...
+
+class CacheInterfaceUser(ABC):
+    @abstractmethod
+    def get_user_cache(self, telegram_username: str, field_name: str) -> str: ...
+
+    def get_user_cache_all(self, telegram_username: str) -> dict: ...
+
+    @abstractmethod
+    def set_user_cache(self, telegram_username: str, cache_name: str, cache_value: str) -> bool: ...

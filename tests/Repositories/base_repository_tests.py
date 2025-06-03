@@ -1,10 +1,10 @@
 import pytest
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from infrastructure.persistance.sqlalchemy.models import Base, User
-from infrastructure.persistance.sqlalchemy.base_repository import BaseRepository
-from infrastructure.persistance.redis.caching_database_manager import CachingDatabaseManager
-from infrastructure.persistance.sqlalchemy.sql_database_manager import SQLDatabaseManager
+from infrastructure.database_access_managers.sqlalchemy.models import Base, User
+from infrastructure.database.repositories.base_repository import BaseRepository
+from infrastructure.database_access_managers.redis.caching_database_manager import CachingDatabaseManager
+from infrastructure.database_access_managers.sqlalchemy.sql_database_manager import SQLDatabaseManager
 
 sql_string = "sqlite:///:memory:"
 

@@ -5,11 +5,11 @@ import pytest
 from dotenv import load_dotenv
 from telebot import types
 
-from infrastructure.persistance.sqlalchemy.models import Task as BDTask
-from infrastructure.persistance.sqlalchemy.models import Workspace as BDWorkspace
-from infrastructure.persistance.redis.caching_database_manager import DatabaseService
+from infrastructure.database_access_managers.sqlalchemy.models import Task as BDTask
+from infrastructure.database_access_managers.sqlalchemy.models import Workspace as BDWorkspace
+from infrastructure.database_access_managers.redis.caching_database_manager import DatabaseService
 from resources.statics import Statics
-from telegram_bot.bot import Bot
+from presentation.telegram_bot.bot import Bot
 
 
 @pytest.fixture

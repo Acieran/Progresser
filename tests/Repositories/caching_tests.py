@@ -3,9 +3,9 @@ import json
 import pytest
 from sqlalchemy.orm import Session
 
-from infrastructure.persistance.sqlalchemy.models import Base, User
-from infrastructure.persistance.redis.caching_database_manager import RedisDatabaseManager, SQLDatabaseManager
-from infrastructure.persistance.sqlalchemy.base_repository import BaseRepository
+from infrastructure.database_access_managers.sqlalchemy.models import Base, User
+from infrastructure.database_access_managers.redis.caching_database_manager import RedisDatabaseManager, SQLDatabaseManager
+from infrastructure.database.repositories.base_repository import BaseRepository
 
 
 @pytest.fixture

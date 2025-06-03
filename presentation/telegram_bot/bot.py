@@ -11,12 +11,15 @@ from sqlalchemy.exc import SQLAlchemyError
 from telebot import types
 from telebot.async_telebot import AsyncTeleBot
 
-from infrastructure.persistance.sqlalchemy.models import Task as BDTask
-from infrastructure.persistance.sqlalchemy.models import User as BDUser
-from infrastructure.persistance.sqlalchemy.models import UserState as BDUserState
-from infrastructure.persistance.sqlalchemy.models import Workspace as BDWorkspace
+from infrastructure.database_access_managers.sqlalchemy.models import Task as BDTask
+from infrastructure.database_access_managers.sqlalchemy.models import User as BDUser
+from infrastructure.database_access_managers.sqlalchemy.models import UserState as BDUserState
+from infrastructure.database_access_managers.sqlalchemy.models import Workspace as BDWorkspace
+from infrastructure.error_handler.errors import CustomError
 from interfaces.shared.schemas import Task
-from infrastructure.persistance.redis.caching_database_manager import DatabaseService
+from infrastructure.database_access_managers.redis.caching_database_manager import CachingDatabaseManager
+from presentation.telegram_bot import error_handler
+from presentation.telegram_bot.telegram_task_creation import TelegramTaskCreation
 from resources.statics import Statics
 
 # --- Configuration ---
@@ -44,6 +47,7 @@ class Bot:
         self.database = DatabaseService()
         self.handlers = []
         self.register_handlers()
+        self.handler = TelegramTaskCreation(CachingDatabaseManager())
 
     def handler(self, **kwargs):  # Custom decorator factory
         def decorator(func):
@@ -58,77 +62,110 @@ class Bot:
     def register_handlers(self):
         """Registers handlers that have been decorated"""
 
-        @self.handler(func=lambda message: message.text == 'Новый' or message.text == '/create_user')
-        async def create_new_user(message):
-            self.log(message)
-            chat = message.chat
+        # @self.bot.message_handler(func=lambda message: message.text == 'Новый' or message.text == '/create_user')
+        # async def create_new_user(message):
+        #     self.log(message)
+        #     chat = message.chat
+        #     try:
+        #         self.database.create_user(chat.username)
+        #         self.logger.info(f"Created new user: {chat.username}")
+        #         await self.bot.reply_to(message,
+        #                                 f"Successfully registered you in the system with username: {chat.username}. \n"
+        #                                 "You can change your username with command /update_username.\n"
+        #                                 "You can use command /view to check your workspaces\n"
+        #                                 "You can use command /create_workspace to create new workspace")
+        #     except SQLAlchemyError:
+        #         self.logger.error(
+        #             f"Error upon creating user with username - {chat.username}. \n Full message - {message}",
+        #             exc_info=True)
+        #         await self.bot.reply_to(message, "There was an error with your request")
+
+        # @self.bot.message_handler(commands=['create_workspace'])
+        # async def create_workspace_handler(message):
+        #     username = message.chat.username
+        #     try:
+        #         self.logger.info(f"User {username} triggered /create_workspace")  # log here
+        #         self.set_state(username, "creating workspace")  # Move to the NAME_WORKSPACE state
+        #         await self.bot.send_message(message.chat.id, "What name would you like to give your workspace?")
+        #     except SQLAlchemyError:
+        #         self.logger.error(
+        #             f"Error upon triggering /create_workspace with username - {username}. \n Full message - {message}",
+        #             exc_info=True)
+        #         await self.bot.send_message(message.chat.id, "There was an error with your request")
+
+        # @self.bot.message_handler(func=lambda message: str(message.text).startswith('/create'))
+        # async def create_something_handler(message):
+        #     await self._create_something_handler(message)
+
+        @self.bot.message_handler(func=lambda message: str(message.text).startswith('/create_task'))
+        async def create_task_handler(message):
             try:
-                self.database.create_user(chat.username)
-                self.logger.info(f"Created new user: {chat.username}")
-                await self.bot.reply_to(message,
-                                        f"Successfully registered you in the system with username: {chat.username}. \n"
-                                        "You can change your username with command /update_username.\n"
-                                        "You can use command /view to check your workspaces\n"
-                                        "You can use command /create_workspace to create new workspace")
-            # TODO Buttons for commands
-            except SQLAlchemyError:
-                self.logger.error(
-                    f"Error upon creating user with username - {chat.username}. \n Full message - {message}",
-                    exc_info=True)
-                await self.bot.reply_to(message, "There was an error with your request")
+                await self.handler.create_task_handler(message)
+            except CustomError as e:
+                error_handler.handle_error(message, message.chat.id, e)
 
-        @self.handler(commands=['create_workspace'])
-        async def create_workspace_handler(message):
-            username = message.chat.username
+        @self.bot.message_handler(func=lambda message: str(message.text).startswith('/edit'))
+        async def edit_task_handler(message):
             try:
-                self.logger.info(f"User {username} triggered /create_workspace")  # log here
-                self.set_state(username, "creating workspace")  # Move to the NAME_WORKSPACE state
-                await self.bot.send_message(message.chat.id, "What name would you like to give your workspace?")
-            except SQLAlchemyError:
-                self.logger.error(
-                    f"Error upon triggering /create_workspace with username - {username}. \n Full message - {message}",
-                    exc_info=True)
-                await self.bot.send_message(message.chat.id, "There was an error with your request")
+                await self.handler.edit_task_handler(message)
+            except CustomError as e:
+                error_handler.handle_error(message, message.chat.id, e)
 
-        @self.handler(func=lambda message: str(message.text).startswith('/create'))
-        async def create_something_handler(message):
-            await self._create_something_handler(message)
-
-        @self.handler(func=lambda message: self.check_state_and_create(message.chat.username) == "creating workspace")
-        async def process_workspace_name(message):
-            chat_id = message.chat.id
-            workspace_name = message.text
-            username = message.chat.username
-            self.logger.info(
-                f"User {username} triggered /create_workspace and entered workspace name - {workspace_name}")
+        @self.bot.message_handler(func=lambda message: str(message.text).startswith('/confirm_creation'))
+        async def confirm_task_creation_handler(message):
             try:
-                self.database.create(BDWorkspace, {"name": workspace_name, "owner_name": username})
-                self.logger.info(f"Creating new Workspace for {username} named {workspace_name}")
-                await self.bot.send_message(chat_id,
-                                            f"Successfully created Workspace named: {workspace_name}.\n"
-                                            "You can use command /view to check your workspaces")
-            # TODO Buttons for commands
-            except SQLAlchemyError:
-                self.logger.error(
-                    f"Error upon creating Workspace for {username} named {workspace_name}. \n Full message - {message}",
-                    exc_info=True)
-                await self.bot.reply_to(message, "There was an error with your request")
-            finally:
-                self.clear_state(username)
+                await self.handler.confirm_creation_handler(message)
+            except CustomError as e:
+                error_handler.handle_error(message, message.chat.id, e)
 
-        @self.handler(func=lambda message: self.check_state_and_create(message.chat.username) in list(self.CLASS_FROM_STATE.keys()))
+        @self.bot.message_handler(func=lambda message: str(message.text).startswith('/cancel'))
+        async def cancel_handler(message):
+            try:
+                await self.handler.confirm_creation_handler(message)
+            except CustomError as e:
+                error_handler.handle_error(message, message.chat.id, e)
+
+        @self.bot.message_handler()
+        async def handle_any_message(message):
+            try:
+                await self.handler.user_prompt_based_on_state(message)
+            except CustomError as e:
+                error_handler.handle_error(message, message.chat.id, e)
+
+        # @self.bot.message_handler(func=lambda message: self.check_state_and_create(message.chat.username) == "creating workspace")
+        # async def process_workspace_name(message):
+        #     chat_id = message.chat.id
+        #     workspace_name = message.text
+        #     username = message.chat.username
+        #     self.logger.info(
+        #         f"User {username} triggered /create_workspace and entered workspace name - {workspace_name}")
+        #     try:
+        #         self.database.create(BDWorkspace, {"name": workspace_name, "owner_name": username})
+        #         self.logger.info(f"Creating new Workspace for {username} named {workspace_name}")
+        #         await self.bot.send_message(chat_id,
+        #                                     f"Successfully created Workspace named: {workspace_name}.\n"
+        #                                     "You can use command /view to check your workspaces")
+        #     except SQLAlchemyError:
+        #         self.logger.error(
+        #             f"Error upon creating Workspace for {username} named {workspace_name}. \n Full message - {message}",
+        #             exc_info=True)
+        #         await self.bot.reply_to(message, "There was an error with your request")
+        #     finally:
+        #         self.clear_state(username)
+
+        @self.bot.message_handler(func=lambda message: self.check_state_and_create(message.chat.username) in list(self.CLASS_FROM_STATE.keys()))
         async def process_something_with_state(message):
             await self._process_something_with_state(message)
 
-        @self.handler(func=lambda message: str(message.text).startswith('/view'))
-        async def view_something(message):
-            try:
-                await self._view_something(message)
-            except Exception as e:
-                self.logger.error(e)
-                await self.bot.reply_to(message, "There was an error with your request")
+        # @self.bot.message_handler(func=lambda message: str(message.text).startswith('/view'))
+        # async def view_something(message):
+        #     try:
+        #         await self._view_something(message)
+        #     except Exception as e:
+        #         self.logger.error(e)
+        #         await self.bot.reply_to(message, "There was an error with your request")
 
-        @self.handler(commands=['start'])
+        @self.bot.message_handler(commands=['start'])
         async def send_start(message):
             self.log(message)
             keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -150,12 +187,12 @@ class Bot:
                                         "or you have an existing one?",
                                         reply_markup=keyboard)
 
-        @self.handler(commands=['about'])
+        @self.bot.message_handler(commands=['about'])
         async def send_about(message):
             self.log(message)
             await self.about(message)
 
-        @self.handler()
+        @self.bot.message_handler()
         async def unprocessed_message(message):
             self.log(self.check_state_and_create(message.chat.username))
             self.logger.info(self.check_state_and_create(message.chat.username) == "creating workspace")

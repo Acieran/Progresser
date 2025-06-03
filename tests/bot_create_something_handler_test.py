@@ -5,7 +5,7 @@ import pytest
 from dotenv import load_dotenv
 
 from resources.statics import Statics
-from telegram_bot.bot import Bot
+from presentation.telegram_bot.bot import Bot
 
 load_dotenv()
 token = os.getenv('TOKEN')

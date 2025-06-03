@@ -31,14 +31,14 @@ class User(Base):
     # password: Mapped[str] = mapped_column(String())
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     telegram_username: Mapped[str] = mapped_column(String, nullable=True)
-    workspace: Mapped[List["Workspace"]] = relationship(
-        back_populates="owner", cascade="all, delete-orphan", lazy="select"
-    )
-    user_state: Mapped[List["UserState"]] = relationship(
-        back_populates="user", cascade="all, delete-orphan", lazy="select"
-    )
-    def __repr__(self) -> str:
-        return f"Username(id={self.username!r}, Active={self.active!r}, Chat_id={self.telegram_username!r})"
+    # workspace: Mapped[List["Workspace"]] = relationship(
+    #     back_populates="owner", cascade="all, delete-orphan", lazy="select"
+    # )
+    # user_state: Mapped[List["UserState"]] = relationship(
+    #     back_populates="user", cascade="all, delete-orphan", lazy="select"
+    # )
+    # def __repr__(self) -> str:
+    #     return f"Username(id={self.username!r}, Active={self.active!r}, Chat_id={self.telegram_username!r})"
 
 class UserState(Base):
     __tablename__ = "user_state"

@@ -1,9 +1,12 @@
 from abc import ABC, abstractmethod
 
+from redis import Redis
+
+
 class DatabaseInterface(ABC):
     @abstractmethod
     def get_session(self): ...
 
-class CacheInterface(ABC):
+class CacheDBConnectionInterface(ABC):
     @abstractmethod
-    def get_connection(self): ...
+    def get_connection(self) -> Redis: ...

@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from dotenv import load_dotenv
 
-from infrastructure.persistance.sqlalchemy.models import Task, User, Workspace
-from telegram_bot.bot import Bot
+from infrastructure.database_access_managers.sqlalchemy.models import Task, User, Workspace
+from presentation.telegram_bot.bot import Bot
 
 load_dotenv()
 token = os.getenv('TOKEN')
