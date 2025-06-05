@@ -12,6 +12,7 @@ from core.application.ports.repositories import BaseRepositoryInterface
 from infrastructure.database_access_managers.redis.caching_database_manager import CachingDatabaseManager
 from infrastructure.database_access_managers.sqlalchemy.models import Base
 from infrastructure.database_access_managers.sqlalchemy.sql_database_manager import SQLDatabaseManager
+from shared.logging_decorator import log
 
 T = TypeVar('T', bound=Base)
 F = TypeVar('F', bound=Callable[..., Any])
@@ -26,20 +27,24 @@ class BaseRepository(BaseRepositoryInterface, CachingInterface):
         self._session: Session | None = None
         self.redis_db_manager = redis_db_manager
 
+    @log
     def transaction(self) -> '_TransactionHelper':
         """Use this when you need multi-operation transactions"""
         return self._TransactionHelper(self)
 
+    @log
     def get_session(self) -> Session | None:
         """Return the current session"""
         return self._session
 
+    @log
     def _ensure_session(self) -> Session:
         if self._session is None:
             raise RuntimeError("Session is not available")
         return self._session
 
     @staticmethod
+    @log
     def transaction_decorator(func: F) -> F:
         """
         Decorator of all database methods that allows to run methods
@@ -57,6 +62,7 @@ class BaseRepository(BaseRepositoryInterface, CachingInterface):
         return cast(F, wrapper)
 
     @staticmethod
+    @log
     def cache(func: F) -> F:
         """
         decorator for caching on methods that return data
@@ -108,6 +114,7 @@ class BaseRepository(BaseRepositoryInterface, CachingInterface):
             session.close()
             self.repository._session = None
 
+    @log
     def _invalidate_cache(
             self,
             model: str,
@@ -119,6 +126,7 @@ class BaseRepository(BaseRepositoryInterface, CachingInterface):
             func(model, item_id) if name == "get_by_id" else func(model)
 
     @transaction_decorator
+    @log
     def create(self, model: type[Base], **kwargs: Any) -> Literal[True]:
         """Creates a new record in the database."""
         try:
@@ -129,12 +137,14 @@ class BaseRepository(BaseRepositoryInterface, CachingInterface):
         except exc.SQLAlchemyError as e:
             raise e
 
+    @log
     def _get_by_id_cache_invalidation(self, model: str, item_id: str | int) -> None:
         redis_conn = self.redis_db_manager.get_connection()
         redis_conn.delete(f"get_by_id:{model}:item_id:{item_id}")
 
     @cache
     @transaction_decorator
+    @log
     def get_by_id(self, model: type[T], item_id: str | int) -> dict[str,Any] | None:
         """Retrieves a record by its primary key (assuming id)."""
         try:
@@ -147,6 +157,7 @@ class BaseRepository(BaseRepositoryInterface, CachingInterface):
 
     @cache
     @transaction_decorator
+    @log
     def get_by_custom_field(self,
                             model: type[T],
                             field_name: str,
@@ -186,6 +197,7 @@ class BaseRepository(BaseRepositoryInterface, CachingInterface):
         except exc.SQLAlchemyError as e:
             raise e
 
+    @log
     def _get_by_custom_fields_cache_invalidation(self, model: str) -> None:
         redis_conn = self.redis_db_manager.get_connection()
         keys_to_del_bin = redis_conn.keys(f"get_by_custom_fields:{model}*")
@@ -194,6 +206,7 @@ class BaseRepository(BaseRepositoryInterface, CachingInterface):
 
     @cache
     @transaction_decorator
+    @log
     def get_by_custom_fields(self, model: type[Base], **kwargs: Any) -> list[dict[str, Any]]:
         """
         Retrieves records from the database based on multiple custom fields
@@ -225,6 +238,7 @@ class BaseRepository(BaseRepositoryInterface, CachingInterface):
             raise e
 
     @transaction_decorator
+    @log
     def update(self, model:type[Base], item_id: str | int, **data: Any) -> bool:
         """Updates a record in the database."""
         try:
@@ -244,6 +258,7 @@ class BaseRepository(BaseRepositoryInterface, CachingInterface):
             raise e
 
     @transaction_decorator
+    @log
     def delete(self, model: type[Base], item_id: str | int) -> bool:
         """Deletes a record from the database."""
         try:
@@ -261,12 +276,14 @@ class BaseRepository(BaseRepositoryInterface, CachingInterface):
         except exc.SQLAlchemyError as e:
             raise e
 
+    @log
     def _get_all_cache_invalidation(self, model: str) -> None:
         redis_conn = self.redis_db_manager.get_connection()
         redis_conn.delete(f"get_all:{model}")
 
     @cache
     @transaction_decorator
+    @log
     def get_all(self, model: type[Base]) -> list[dict[str, Any]]:
         """Returns all records of the database table"""
         try:

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from core.application.ports.database import DatabaseInterface
 from infrastructure.database_access_managers.sqlalchemy.models import Base
+from shared.logging_decorator import log
 
 
 class SQLDatabaseManager(DatabaseInterface):
@@ -18,9 +19,11 @@ class SQLDatabaseManager(DatabaseInterface):
                                          bind=self.engine,
                                          expire_on_commit=expire_on_commit)
 
+    @log
     def get_session(self) -> Session:
         return self.SessionLocal()
 
+    @log
     def reset_database(self) -> None:
         Base.metadata.drop_all(self.engine)
         Base.metadata.create_all(self.engine)

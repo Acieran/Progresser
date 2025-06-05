@@ -1,6 +1,7 @@
 from telebot.async_telebot import AsyncTeleBot
 
 from infrastructure.error_handler.errors import CustomError
+from shared.logging_decorator import log
 
 
 def handle_error(bot: AsyncTeleBot, chat_id: int, error: CustomError) -> None:

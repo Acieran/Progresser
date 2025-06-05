@@ -1,10 +1,12 @@
 from datetime import datetime
 
 from core.application.ports.repositories import BaseRepositoryInterface
-from core.application.utilities import dict_to_task, dict_to_user
+from core.application.tasks.shared import user_check_existence_and_return, task_check_existence_access_and_return
 from core.domain.entities import Entities, Task, User
+from shared.logging_decorator import log
 
 
+@log
 def create_new_task_use_case(
         db_repository: BaseRepositoryInterface,
         bd_model_dict: dict[type[Entities], ...],
@@ -43,22 +45,15 @@ def create_new_task_use_case(
         validation_errors['due_date'] = "Due date cannot be in the past"
 
     # Проверка существования пользователя
-    user = User(username=user_id, active=True)
-    if user_id:
-        user_dict = db_repository.get_by_id(bd_model_dict[Task], user_id)
-        if not user_dict:
-            db_repository.create(bd_model_dict[User], username=user_id, active=True)
-        else:
-            user = dict_to_user(**user_dict)
+    user = user_check_existence_and_return(db_repository, bd_model_dict, user_id)
+    if user is None:
+        user = User(user_id, True, user_id)
 
     # Проверка существования родительской задачи
     if parent_task_id:
-        parent_task_dict = db_repository.get_by_id(bd_model_dict[Task], parent_task_id)
-        if not parent_task_dict:
-            validation_errors['parent_task_id'] = f"Parent task {parent_task_id} not found"
-        parent_task = dict_to_task(**parent_task_dict)
-        if parent_task.user.username != user.username:
-            validation_errors['parent_task_id'] = "You don't have access to this parent task"
+        check_task = task_check_existence_access_and_return(db_repository, bd_model_dict, parent_task_id, user)
+        if not isinstance(check_task, Task):
+            validation_errors['parent_task_id'] = check_task
 
     if validation_errors:
         return {
@@ -69,7 +64,7 @@ def create_new_task_use_case(
 
     # Создание объекта задачи
     new_task = Task(
-        user=user,
+        owner_name=user_id,
         title=title.strip(),
         description=description.strip() if description else None,
         due_date=due_date,
@@ -81,6 +76,9 @@ def create_new_task_use_case(
 
     # Сохранение в БД
     try:
+        for key in new_task.__annotations__.keys():
+            if new_task.__getattribute__(key) is None:
+                new_task.__delattr__(key)
         db_repository.create(bd_model_dict[Task], **new_task.__dict__)
 
         # # Обновление родительской задачи если нужно

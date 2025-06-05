@@ -1,4 +1,4 @@
-from presentation.telegram_bot import telegram_task_creation
+from shared.logging_decorator import log
 
 STATES = {"default_short",
           "default_detail",
@@ -49,7 +49,7 @@ state_transitions = {
     "task_menu": {
         "/edit_name": "task_name_prompt",
         "/edit_description": "task_description_prompt",
-        "/edit_due_data": "task_due_date_prompt",
+        "/edit_due_date": "task_due_date_prompt",
         "/edit_priority": "task_priority_prompt",
         "/edit_all": "task_all_prompt",
         "/confirm_creation": "default_short",
@@ -58,38 +58,23 @@ state_transitions = {
 
     # === Поля ввода ===
     "task_name_prompt": {
-        "text_input": {
-            "next_state": "task_menu",
-            "actions": ["update_task_name(text)"]
-        },
+        "text_input": "task_menu",
         "/cancel": "task_menu"
     },
     "task_description_prompt": {
-        "text_input": {
-            "next_state": "task_menu",
-            "actions": ["update_task_description(text)"]
-        },
+        "text_input": "task_menu",
         "/cancel": "task_menu"
     },
     "task_due_date_prompt": {
-        "text_input": {
-            "next_state": "task_menu"
-        },
+        "text_input": "task_menu",
         "/cancel": "task_menu"
     },
     "task_priority_prompt": {
-        "text_input": {
-            "next_state": "task_menu",
-            "actions": ["update_task_priority(text)"],
-            "validation": "priority in [1,2,3]"
-        },
+        "text_input": "task_menu",
         "/cancel": "task_menu"
     },
     "task_all_prompt": {
-        "text_input": {
-            "next_state": "task_menu",
-            "actions": ["update_all_task_fields(text)"]
-        },
+        "text_input": "task_menu",
         "/cancel": "task_menu"
     },
 
@@ -113,54 +98,29 @@ state_transitions = {
     }
 }
 
-
+@log
 def validate_transition(current_state: str, command: str, context: dict | None = None, **kwargs):
     # Извлечение базовой команды (без параметров)
     base_command = command.split()[0] if command.startswith('/') else command
 
-    # Проверка существования перехода
-    if base_command not in state_transitions.get(current_state, {}):
-        return {
-            "valid": False,
-            "error": f"Command '{base_command}' not available in {current_state}"
-        }
+    if command.startswith("/"):
 
-    transition = state_transitions[current_state][base_command]
-
-    # Проверка условий для условных переходов
-    if isinstance(transition, dict) and "condition" in transition:
-        condition_met = evaluate_condition(transition["condition"], context)
-        if not condition_met:
+        # Проверка существования перехода
+        if base_command not in state_transitions.get(current_state, {}):
             return {
                 "valid": False,
-                "error": f"Condition not met for {command}",
-                "condition": transition["condition"]
+                "error": f"Command '{base_command}' not available in {current_state}"
             }
+
+        transition = state_transitions[current_state][base_command]
+    else:
+        transition = state_transitions[current_state]["text_input"]
 
     # Определение целевого состояния
     next_state = transition if isinstance(transition, str) else transition.get("next_state", current_state)
-
-    actions = transition.get("actions", []) if isinstance(transition, dict) else []
-    for action in actions:
-        action_name = action.get("name")
-        arguments = []
-        for argument in action.get("arguments", []):
-            if argument in kwargs:
-                arguments.append(kwargs[argument])
-        action_name(*arguments)
-
 
     return {
         "valid": True,
         "next_state": next_state,
         "actions": transition.get("actions", []) if isinstance(transition, dict) else []
     }
-
-
-def evaluate_condition(condition, context):
-    """Вычисление условий перехода"""
-    conditions = {
-        "breadcrumbs not empty": lambda ctx: bool(ctx.get('breadcrumbs', [])),
-        "task_id exists and accessible": lambda ctx: task_exists(ctx.get('task_id'))
-    }
-    return conditions.get(condition, lambda _: False)(context)

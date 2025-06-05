@@ -8,24 +8,25 @@ class Entities:
 
 @dataclass
 class Task(Entities):
-    user: User
+    owner_name: str
     title: str
-    description: str | None = None
-    due_date: datetime | None = None
-    priority: int | None = None
-    is_complete: bool | None = None
-    parent_task_id: int | None = None
+    id: int = None
+    description: str = None
+    due_date: datetime = None
+    priority: int = None
+    is_complete: bool = None
+    parent_task_id: int = None
     weight: int = 1
-    children_tasks: list[Task] | None = None
+    children_tasks: list[Task] = None
 
 @dataclass
 class User(Entities):
     username: str
     active: bool = True
-    telegram_username: str | None = None
+    telegram_username: str = None
 
 @dataclass
 class TelegramUser(Entities):
     user_id: int
     telegram_username: str
-    telegram_state: str | None = None
+    telegram_state: str = None
