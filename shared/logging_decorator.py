@@ -31,3 +31,6 @@ def log(func):
             logger.exception(f"Exception {e.__name__} in {func.__name__}")
             raise
     return wrapper
+
+def log_exception(e, func_name):
+    logger.exception(f"{func_name} produced exception - {e}")

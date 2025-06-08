@@ -8,7 +8,7 @@ from typing import Any, Dict, Type
 from dotenv import load_dotenv
 from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
-from telebot import types
+from telebot import types, ExceptionHandler
 from telebot.async_telebot import AsyncTeleBot
 
 from infrastructure.cache.cache_repository import CacheRepositoryUser
@@ -20,9 +20,11 @@ from infrastructure.database_access_managers.sqlalchemy.sql_database_manager imp
 from infrastructure.error_handler.errors import CustomError
 from infrastructure.database_access_managers.redis.caching_database_manager import CachingDatabaseManager
 from presentation.telegram_bot import error_handler
+from presentation.telegram_bot.error_handler import CustomErrorHandler
 from presentation.telegram_bot.telegram_task_management import TelegramTaskManagement
 from resources.statics import Statics
 from shared.logging_decorator import log
+
 
 class Bot:
     def __init__(self, token):
@@ -34,6 +36,8 @@ class Bot:
         #                      BDTask.__name__: BDTask,
         #                      }
         self.bot = AsyncTeleBot(token=token)
+        self.bot.exception_handler = CustomErrorHandler(self.bot)
+        self.exception_handler = self.bot.exception_handler
         self.cached_state = {}
         self.logger = logging.getLogger(__name__)# Logger for Bot
         current_dir = Path(__file__).parent
@@ -43,10 +47,11 @@ class Bot:
                 / "database"
                 / "progresser.db"
         ).resolve()
-        self.database = BaseRepository(SQLDatabaseManager(f"sqlite:///{db_path}"),CachingDatabaseManager())
+        caching_database_manager = CachingDatabaseManager()
+        self.database = BaseRepository(SQLDatabaseManager(f"sqlite:///{db_path}"),caching_database_manager)
         self.handlers = []
         self.register_handlers()
-        self.handler = TelegramTaskManagement(StateManager(CacheRepositoryUser(CachingDatabaseManager())),self.database)
+        self.handler = TelegramTaskManagement(StateManager(CacheRepositoryUser(caching_database_manager)),self.database)
 
     def handler(self, **kwargs):  # Custom decorator factory
         def decorator(func):
@@ -104,7 +109,7 @@ class Bot:
                 self.handler.create_task_handler(message)
                 await self.bot.send_message(message.chat.id, "Пожалуйста, введите наименование задачи")
             except CustomError as e:
-                error_handler.handle_error(message, message.chat.id, e)
+                await self.exception_handler.handle_error(e, message.chat.id)
 
         @self.bot.message_handler(func=lambda message: str(message.text).startswith('/edit'))
         @log
@@ -113,16 +118,16 @@ class Bot:
                 text, markup = self.handler.edit_task_handler(message)
                 await self.bot.reply_to(message, text, reply_markup=markup)
             except CustomError as e:
-                error_handler.handle_error(message, message.chat.id, e)
+                await self.exception_handler.handle_error(e, message.chat.id)
 
         @self.bot.message_handler(func=lambda message: str(message.text).startswith('/confirm_creation'))
         @log
         async def confirm_task_creation_handler(message):
             try:
-                # self.bot.send_message()
-                self.handler.confirm_creation_handler(message)
+                text, reply_markup = self.handler.confirm_creation_handler(message)
+                await self.bot.reply_to(message, text, reply_markup=reply_markup)
             except CustomError as e:
-                error_handler.handle_error(message, message.chat.id, e)
+                await self.exception_handler.handle_error(e, message.chat.id)
 
         @self.bot.message_handler(func=lambda message: str(message.text).startswith('/cancel'))
         @log
@@ -130,7 +135,7 @@ class Bot:
             try:
                 await self.handler.confirm_creation_handler(message)
             except CustomError as e:
-                error_handler.handle_error(message, message.chat.id, e)
+                await self.exception_handler.handle_error(e, message.chat.id)
 
         # @self.bot.message_handler(func=lambda message: self.check_state_and_create(message.chat.username) == "creating workspace")
         # async def process_workspace_name(message):

@@ -20,6 +20,7 @@ class CachingDatabaseManager(CacheDBConnectionInterface):
             password=password)
         self._username = username
         self._password = password
+        self.test_connection()
 
     @log
     def get_connection(self) -> redis.Redis:
@@ -29,8 +30,7 @@ class CachingDatabaseManager(CacheDBConnectionInterface):
             connection_pool=self._pool,
         )
 
-def test_connection():
-    cach = CachingDatabaseManager()
-    r = cach.get_connection()
-    r.set("ok",1)
-    print(r.get("ok"))
+    def test_connection(self):
+        r = self.get_connection()
+        r.set("ok",1)
+        r.get("ok")

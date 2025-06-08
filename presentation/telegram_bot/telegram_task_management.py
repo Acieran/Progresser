@@ -6,7 +6,7 @@ from infrastructure.cache import state_manager
 from infrastructure.database.repositories.base_repository import BaseRepository
 from infrastructure.database_access_managers.sqlalchemy.models import User as BDUser, Task as BDTask
 from infrastructure.error_handler.errors import WrongTransitionError, InternalCreationError, EntityNotFoundError
-from presentation.telegram_bot.telegram_response_manager import TelegramResponseManager
+from presentation.telegram_bot.telegram_response_manager import TelegramResponseManager, automatic_response_generation
 from presentation.telegram_bot import state_service
 from shared.logging_decorator import log
 
@@ -112,11 +112,17 @@ class TelegramTaskManagement:
             self.task["parent_task"],
         )
         if operation_result["status"] != "success":
-            raise InternalCreationError(operation_result["error"], telegram_username, current_state, command)
+            raise InternalCreationError(operation_result["errors"], telegram_username, current_state, command)
         else:
             self.switch_to_next_state(telegram_username, next_state)
-        text, reply_markup = self.tg_resp_manager.edit_task_data(next_state, command, self.task)
-        return text, reply_markup
+            tasks = get_child_tasks_use_case(
+                self.bd_repository,
+                self.type_dict,
+                telegram_username,
+                self.task["parent_task"],
+            )
+            text, reply_markup = automatic_response_generation(next_state, self.task)
+            return text, reply_markup
 
     @log
     def get_current_task_view(self, message):

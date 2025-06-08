@@ -65,7 +65,7 @@ class Task(Base):
     title: Mapped[str] = mapped_column(String(100))
     description: Mapped[Optional[str]] = mapped_column(String(5000), nullable=True)
     due_date: Mapped[datetime] = mapped_column(DateTime, nullable=True)
-    priority: Mapped[int] = mapped_column(Integer)
+    priority: Mapped[int] = mapped_column(Integer, default=5)
     is_complete: Mapped[bool] = mapped_column(Boolean, default=False)
     weight: Mapped[float] = mapped_column(Float, default=1)
     owner_name: Mapped[str] = mapped_column(ForeignKey("users.username"))
