@@ -1,29 +1,26 @@
 from datetime import datetime
 
-from core.application.ports.repositories import BaseRepositoryInterface
-from core.application.tasks.shared import user_check_existence_and_return, task_check_existence_access_and_return
-from core.domain.entities import Entities, Task, User
+from core.application.shared.shared_manager import SharedManager
+from core.application.shared.use_cases.shared_use_cases import task_check_existence_access_and_return, user_check_existence_or_create
+from core.domain.entities import Task
 from shared.logging_decorator import log
-
 
 @log
 def create_new_task_use_case(
-        db_repository: BaseRepositoryInterface,
-        bd_model_dict: dict[type[Entities], ...],
+        self: SharedManager,
         user_id: str,
         title: str,
         description: str = None,
         due_date: datetime = None,
         priority: int = None,
         parent_task_id: int = None,
-        **kwargs
+        **kwargs,
 ) -> dict[str, ...]:
     """
     Создает новую задачу с валидацией и сохранением в БД
     Возвращает словарь с результатом операции
 
-    :param db_repository: модуль работы с базой данных
-    :param bd_model_dict: Словарь конвертации объектов из enitities в BD models
+    :param self: модуль работы с базой use_case Task
     :param user_id: Объект пользователя
     :param title: Название задачи (обязательное)
     :param description: Описание задачи
@@ -38,28 +35,28 @@ def create_new_task_use_case(
     if not title or len(title.strip()) < 3:
         validation_errors['title'] = "Title must be at least 3 characters"
 
-    if priority is not None and (priority < 1 or priority > 3):
-        validation_errors['priority'] = "Priority must be between 1 and 3"
+    if priority and (1 > priority or priority > 5):
+        validation_errors['priority'] = "Priority must be between 1 and 5 inclusive"
 
     if due_date and due_date < datetime.now():
         validation_errors['due_date'] = "Due date cannot be in the past"
 
     # Проверка существования пользователя
-    user = user_check_existence_and_return(db_repository, bd_model_dict, user_id)
+    user = user_check_existence_or_create(shared_manager=self, user_id=user_id)
     if user is None:
-        user = User(user_id, True, user_id)
+        validation_errors['user'] = "User does not exist"
 
     # Проверка существования родительской задачи
     if parent_task_id:
-        check_task = task_check_existence_access_and_return(db_repository, bd_model_dict, parent_task_id, user)
+        check_task = task_check_existence_access_and_return(task_use_case=self, task_id=parent_task_id, username=user_id)
         if not isinstance(check_task, Task):
             validation_errors['parent_task_id'] = check_task
 
     if validation_errors:
         return {
-            'status': 'error',
+            'status': 'validation_error',
             'errors': validation_errors,
-            'task': None
+            'id': None
         }
 
     # Создание объекта задачи
@@ -79,15 +76,13 @@ def create_new_task_use_case(
         for key in new_task.__annotations__.keys():
             if new_task.__getattribute__(key) is None:
                 new_task.__delattr__(key)
-        db_repository.create(bd_model_dict[Task], **new_task.__dict__)
-
-        # # Обновление родительской задачи если нужно
-        # if parent_task_id:
-        #     db_repository.update(bd_model_dict[Task], parent_task_id, saved_task.id)
+        new_id = self.db_repository.create(self.db_model_dict[Task], **new_task.__dict__)
+        if new_task.parent_task_id is not None:
+            self.cache_repo.drop_task_progress_cache(new_task.parent_task_id)
 
         return {
             'status': 'success',
-            'task': new_task,
+            'id': new_id,
             'message': f"Task '{new_task.title}' created successfully"
         }
 
@@ -96,5 +91,5 @@ def create_new_task_use_case(
         return {
             'status': 'error',
             'errors': {'database': f"Database error: {str(e)}"},
-            'task': None
+            'id': None
         }

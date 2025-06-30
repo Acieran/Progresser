@@ -2,8 +2,8 @@ import inspect
 
 from telebot.async_telebot import ExceptionHandler
 
-from infrastructure.error_handler.errors import CustomError
-from shared.logging_decorator import log, log_exception
+from infrastructure.error_handler.errors import CustomError, BusinessError
+from shared.logging_decorator import log, log_exception, log_business_error
 
 
 class CustomErrorHandler(ExceptionHandler):
@@ -21,5 +21,9 @@ class CustomErrorHandler(ExceptionHandler):
         # Extract caller function object
         caller_function = caller_frame.f_code.co_name
 
-        log_exception(e, caller_function)
-        await self.bot.send_message(chat_id=chat_id, text="There was an error while handling this request.")
+        if isinstance(e, BusinessError):
+            log_business_error(e, caller_function)
+            await self.bot.send_message(chat_id=chat_id, text=str(e))
+        else:
+            log_exception(e, caller_function)
+            await self.bot.send_message(chat_id=chat_id, text="There was an error while handling this request.")

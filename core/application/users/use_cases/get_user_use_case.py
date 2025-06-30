@@ -1,5 +1,5 @@
 from core.application.ports.repositories import BaseRepositoryInterface
-from core.application.tasks.shared import user_check_existence_and_return
+from core.application.shared.use_cases.shared_use_cases import user_check_existence_and_return
 from core.domain.entities import Entities
 from shared.logging_decorator import log
 

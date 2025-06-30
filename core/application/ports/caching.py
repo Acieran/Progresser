@@ -27,11 +27,30 @@ class CachingInterface(ABC):
     @abstractmethod
     def _get_all_cache_invalidation(self, model: str) -> None: ...
 
-class CacheInterfaceUser(ABC):
+class CacheInterface(ABC):
     @abstractmethod
     def get_user_cache(self, telegram_username: str, field_name: str) -> str: ...
 
+    @abstractmethod
     def get_user_cache_all(self, telegram_username: str) -> dict: ...
 
     @abstractmethod
     def set_user_cache(self, telegram_username: str, cache_name: str, cache_value: str) -> bool: ...
+
+    @abstractmethod
+    def set_task_progress_cache(self, task_id: int, progress: float) -> bool: ...
+
+    @abstractmethod
+    def get_task_progress_cache(self, task_id: int) -> float | None: ...
+
+    @abstractmethod
+    def drop_task_progress_cache(self, task_id: int) -> bool: ...
+
+    @abstractmethod
+    def clear_user_task_fields_cache(self, telegram_username: str) -> bool: ...
+
+    @abstractmethod
+    def set_user_task_fields_cache(self, telegram_username: str, cache_dict: dict) -> bool: ...
+
+
+

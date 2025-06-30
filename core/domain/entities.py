@@ -9,7 +9,7 @@ class Entities:
 @dataclass
 class Task(Entities):
     owner_name: str
-    title: str
+    title: str = None
     id: int = None
     description: str = None
     due_date: datetime = None

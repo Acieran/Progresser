@@ -1,41 +1,39 @@
 import asyncio
 import logging
 import os
-import re
 from pathlib import Path
-from typing import Any, Dict, Type
 
 from dotenv import load_dotenv
-from pydantic import ValidationError
-from sqlalchemy.exc import SQLAlchemyError
-from telebot import types, ExceptionHandler
+from telebot import types
 from telebot.async_telebot import AsyncTeleBot
 
-from infrastructure.cache.cache_repository import CacheRepositoryUser
+from core.application.users.user_manager import UserManager
+from infrastructure.database_access_managers.sqlalchemy.models import User as BDUser, Task as BDTask
+from core.domain.entities import Task as EntityTask, User as EntityUser
+from infrastructure.cache.cache_repository import CacheRepository
 from infrastructure.cache.state_manager import StateManager
 from infrastructure.database.repositories.base_repository import BaseRepository
-from infrastructure.database_access_managers.sqlalchemy.models import Task as BDTask
-from infrastructure.database_access_managers.sqlalchemy.models import User as BDUser
 from infrastructure.database_access_managers.sqlalchemy.sql_database_manager import SQLDatabaseManager
-from infrastructure.error_handler.errors import CustomError
 from infrastructure.database_access_managers.redis.caching_database_manager import CachingDatabaseManager
-from presentation.telegram_bot import error_handler
+from presentation.telegram_bot import in_message_handlers
 from presentation.telegram_bot.error_handler import CustomErrorHandler
+from presentation.telegram_bot.deeplink_start_parser import parse_deep_link
 from presentation.telegram_bot.telegram_task_management import TelegramTaskManagement
-from resources.statics import Statics
 from shared.logging_decorator import log
+import resources
 
 
 class Bot:
     def __init__(self, token):
-        # self.CLASS_FROM_STATE = {
+        # shared_manager.CLASS_FROM_STATE = {
         #     # "/create_TaskList": (TaskList, BDTaskList, BDWorkspace),
         #     "/create_Task": (Task, BDTask, BDWorkspace)
         # }
-        # self.AVAILABLE_CLASSES = {BDWorkspace.__name__: BDWorkspace,
+        # shared_manager.AVAILABLE_CLASSES = {BDWorkspace.__name__: BDWorkspace,
         #                      BDTask.__name__: BDTask,
         #                      }
         self.bot = AsyncTeleBot(token=token)
+        self.bot.error_handler = CustomErrorHandler(self.bot)
         self.bot.exception_handler = CustomErrorHandler(self.bot)
         self.exception_handler = self.bot.exception_handler
         self.cached_state = {}
@@ -51,469 +49,123 @@ class Bot:
         self.database = BaseRepository(SQLDatabaseManager(f"sqlite:///{db_path}"),caching_database_manager)
         self.handlers = []
         self.register_handlers()
-        self.handler = TelegramTaskManagement(StateManager(CacheRepositoryUser(caching_database_manager)),self.database)
+        self.user_manager = UserManager(
+            db_repository=self.database,
+            db_model_dict={
+                EntityTask: BDTask,
+                EntityUser: BDUser
+            },
+            cache_repo=CacheRepository(caching_database_manager)
+        )
+        self.task_manager = TelegramTaskManagement(StateManager(CacheRepository(caching_database_manager)), self.database)
+        self.in_message_handler = in_message_handlers.InMessageHandler(
+            bot=self.bot,
+            task_manager=self.task_manager,
+            exception_handler=self.exception_handler
+        )
 
-    def handler(self, **kwargs):  # Custom decorator factory
-        def decorator(func):
-            @self.bot.message_handler(**kwargs)  # Extract register logic to here
-            async def wrapper(message):
-                return await func(message)  # self here and await
-
-            return wrapper  # Return function for decoration
-
-        return decorator
 
     @log
     def register_handlers(self):
         """Registers handlers that have been decorated"""
-
-        # @self.bot.message_handler(func=lambda message: message.text == 'Новый' or message.text == '/create_user')
-        # async def create_new_user(message):
-        #     self.log(message)
-        #     chat = message.chat
-        #     try:
-        #         self.database.create_user(chat.username)
-        #         self.logger.info(f"Created new user: {chat.username}")
-        #         await self.bot.reply_to(message,
-        #                                 f"Successfully registered you in the system with username: {chat.username}. \n"
-        #                                 "You can change your username with command /update_username.\n"
-        #                                 "You can use command /view to check your workspaces\n"
-        #                                 "You can use command /create_workspace to create new workspace")
-        #     except SQLAlchemyError:
-        #         self.logger.error(
-        #             f"Error upon creating user with username - {chat.username}. \n Full message - {message}",
-        #             exc_info=True)
-        #         await self.bot.reply_to(message, "There was an error with your request")
-
-        # @self.bot.message_handler(commands=['create_workspace'])
-        # async def create_workspace_handler(message):
-        #     username = message.chat.username
-        #     try:
-        #         self.logger.info(f"User {username} triggered /create_workspace")  # log here
-        #         self.set_state(username, "creating workspace")  # Move to the NAME_WORKSPACE state
-        #         await self.bot.send_message(message.chat.id, "What name would you like to give your workspace?")
-        #     except SQLAlchemyError:
-        #         self.logger.error(
-        #             f"Error upon triggering /create_workspace with username - {username}. \n Full message - {message}",
-        #             exc_info=True)
-        #         await self.bot.send_message(message.chat.id, "There was an error with your request")
-
-        # @self.bot.message_handler(func=lambda message: str(message.text).startswith('/create'))
-        # async def create_something_handler(message):
-        #     await self._create_something_handler(message)
-
         @self.bot.message_handler(func=lambda message: str(message.text).startswith('/create_task'))
         @log
-        async def create_task_handler(message):
-            try:
-                self.handler.create_task_handler(message)
-                await self.bot.send_message(message.chat.id, "Пожалуйста, введите наименование задачи")
-            except CustomError as e:
-                await self.exception_handler.handle_error(e, message.chat.id)
+        async def create_task_message_receiver(message):
+            await self.in_message_handler.create_in_message_task_handler(message)
 
-        @self.bot.message_handler(func=lambda message: str(message.text).startswith('/edit'))
+        @self.bot.message_handler(func=lambda message: str(message.text).startswith('/edit_task'))
         @log
-        async def edit_task_handler(message):
-            try:
-                text, markup = self.handler.edit_task_handler(message)
-                await self.bot.reply_to(message, text, reply_markup=markup)
-            except CustomError as e:
-                await self.exception_handler.handle_error(e, message.chat.id)
+        async def edit_task_message_receiver(message):
+            await self.in_message_handler.edit_in_message_task_handler(message)
+
+        @self.bot.message_handler(func=lambda message: str(message.text).startswith('/delete_task'))
+        @log
+        async def delete_task_message_receiver(message):
+            await self.in_message_handler.delete_in_message_task_handler(message)
 
         @self.bot.message_handler(func=lambda message: str(message.text).startswith('/confirm_creation'))
         @log
-        async def confirm_task_creation_handler(message):
+        async def confirm_task_creation_message_receiver(message):
             try:
-                text, reply_markup = self.handler.confirm_creation_handler(message)
-                await self.bot.reply_to(message, text, reply_markup=reply_markup)
-            except CustomError as e:
+                text, reply_markup = self.task_manager.confirm_creation_handler(message)
+                await self.bot.reply_to(message, text, reply_markup=reply_markup, parse_mode="MarkdownV2")
+            except Exception as e:
                 await self.exception_handler.handle_error(e, message.chat.id)
+
+        @self.bot.message_handler(func=lambda message: str(message.text).startswith('/confirm_edit'))
+        @log
+        async def confirm_task_edit_message_receiver(message):
+            try:
+                text, reply_markup = self.task_manager.confirm_edit_handler(message)
+                await self.bot.reply_to(message=message, text=text, reply_markup=reply_markup, parse_mode="MarkdownV2")
+            except Exception as e:
+                await self.exception_handler.handle_error(e, message.chat.id)
+
+        @self.bot.message_handler(func=lambda message: str(message.text).startswith('/confirm_deletion'))
+        @log
+        async def confirm_task_delete_message_receiver(message):
+            try:
+                text, reply_markup = self.task_manager.confirm_deletion_handler(message)
+                await self.bot.reply_to(message=message, text=text, reply_markup=reply_markup, parse_mode="MarkdownV2")
+            except Exception as e:
+                await self.exception_handler.handle_error(e, message.chat.id)
+
+        @self.bot.message_handler(func=lambda message: str(message.text).startswith('/next'))
+        @log
+        async def next_message_receiver(message):
+            await self.in_message_handler.next_in_message_task_handler(message)
+
 
         @self.bot.message_handler(func=lambda message: str(message.text).startswith('/cancel'))
         @log
-        async def cancel_handler(message):
+        async def cancel_message_receiver(message):
             try:
-                await self.handler.confirm_creation_handler(message)
-            except CustomError as e:
+                text, reply_markup = self.task_manager.cancel_handler(message)
+                await self.bot.reply_to(message=message, text=text, reply_markup=reply_markup, parse_mode="MarkdownV2")
+            except Exception as e:
                 await self.exception_handler.handle_error(e, message.chat.id)
-
-        # @self.bot.message_handler(func=lambda message: self.check_state_and_create(message.chat.username) == "creating workspace")
-        # async def process_workspace_name(message):
-        #     chat_id = message.chat.id
-        #     workspace_name = message.text
-        #     username = message.chat.username
-        #     self.logger.info(
-        #         f"User {username} triggered /create_workspace and entered workspace name - {workspace_name}")
-        #     try:
-        #         self.database.create(BDWorkspace, {"name": workspace_name, "owner_name": username})
-        #         self.logger.info(f"Creating new Workspace for {username} named {workspace_name}")
-        #         await self.bot.send_message(chat_id,
-        #                                     f"Successfully created Workspace named: {workspace_name}.\n"
-        #                                     "You can use command /view to check your workspaces")
-        #     except SQLAlchemyError:
-        #         self.logger.error(
-        #             f"Error upon creating Workspace for {username} named {workspace_name}. \n Full message - {message}",
-        #             exc_info=True)
-        #         await self.bot.reply_to(message, "There was an error with your request")
-        #     finally:
-        #         self.clear_state(username)
-
-        # @self.bot.message_handler(func=lambda message: self.check_state_and_create(message.chat.username) in list(self.CLASS_FROM_STATE.keys()))
-        # async def process_something_with_state(message):
-        #     await self._process_something_with_state(message)
-
-        # @self.bot.message_handler(func=lambda message: str(message.text).startswith('/view'))
-        # async def view_something(message):
-        #     try:
-        #         await self._view_something(message)
-        #     except Exception as e:
-        #         self.logger.error(e)
-        #         await self.bot.reply_to(message, "There was an error with your request")
 
         @self.bot.message_handler(commands=['start'])
         @log
         async def send_start(message):
-            keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-            username = message.chat.username
-
-            db_user = self.database.get_by_custom_field(model=BDUser, field_name="telegram_username", field_value=username)
-            keyboard.row(
-                types.KeyboardButton('/create_task'),
-                types.KeyboardButton('/delete_task'),
-            )
-            await self.bot.reply_to(message, f"Hello, {db_user["username"]}, how can I help you? \n"
+            if len(message.text.split()) > 1:
+                parse_deep_link(self.in_message_handler, message)
+            else:
+                #TODO Redo this part
+                keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+                username = message.chat.username
+                user = self.user_manager.get_user_or_create_use_case(user_id=username)
+                keyboard.row(
+                    types.KeyboardButton('/create_task'),
+                    types.KeyboardButton('/delete_task'),
+                )
+                await self.bot.reply_to(message, f"Hello, {user.telegram_username}, how can I help you? \n"
                                                  '"/create_task" to create task \n'
                                                  "/delete_task to delete task", reply_markup=keyboard)
 
         @self.bot.message_handler(commands=['about'])
         @log
         async def send_about(message):
-            await self.about(message)
+            text, reply_markup = self.task_manager.about()
+            with open("resources/out-0.png", "rb") as photo_file:
+                await self.bot.send_photo(
+                    chat_id=message.chat.id,
+                    photo=photo_file,
+                    caption=text,
+                    reply_markup=reply_markup
+                )
 
         @self.bot.message_handler()
         @log
         async def handle_any_message(message):
             try:
-                text, markup = self.handler.user_prompt_based_on_state(message)
+                text, markup = self.task_manager.user_prompt_based_on_state(message)
                 await self.bot.reply_to(message, text, reply_markup=markup)
-            except CustomError as e:
-                error_handler.handle_error(message, message.chat.id, e)
-
-        # @self.bot.message_handler()
-        # async def unprocessed_message(message):
-        #     self.log(self.check_state_and_create(message.chat.username))
-        #     self.logger.info(self.check_state_and_create(message.chat.username) == "creating workspace")
-        #     self.logger.info(f"There is an unprocessed message: {message.text}\n Full message - {message}")
-
-    @log
-    def parse_message(self, message) -> Dict[str, Any]:
-        """
-        Parses a multi-line message string to extract key-value pairs.
-
-        The message is expected to be in the format "key - value" on separate lines.
-        The extracted key-value pairs are stored in a dictionary, which is then returned.
-        A boolean dictionary is used to convert string representations of booleans to actual boolean types.
-
-        Args:
-            message: A telegram message object containing the text to parse.  Specifically the `message.text` attribute is used.
-
-        Returns:
-            A dictionary containing the extracted key-value pairs.  The keys are strings
-            extracted from the message, and the values are strings or booleans (if the key
-            is "Completed" and the value can be converted to a boolean).  Returns a dictionary.
-
-        Raises:
-            KeyError: If the value for 'Completed' is not found in the `boolean_dict`.
-            AttributeError: Can be raised by the `re.match` or string operations.
-
-        Example:
-            Given a message with the following text:
-            "Task - Buy groceries
-            Completed - Yes
-            Due Date - 2023-12-25"
-
-            The function would return:
-            {
-                "Task": "Buy groceries",
-                "Completed": True,
-                "Due Date": "2023-12-25"
-            }
-        """
-        self.logger.info(f"User {message.chat.username} triggered parse_message message - {message.text}")
-        text = message.text
-        result = {}
-        boolean_dict = {
-            "Да": True,
-            "Нет": False,
-            "1": True,
-            "0": False,
-            "Y": True,
-            "N": False,
-            "True": True,
-            "False": False,
-            "Yes": True,
-            "No": False,
-        }
-        try:
-            lines = text.splitlines()
-
-            for line in lines:
-                match = re.match(r"^(.*?)\s*-\s*(.*)$", line)  # Captures before and after ' - '
-
-                if match:
-                    field = match.group(1).strip()
-                    value = match.group(2).strip()
-                    if field == "Completed":
-                        value = boolean_dict[value]
-                    # if field == "Weight": float(value)
-                    result[field] = str(value)
-            self.logger.info(f"User {message.chat.username} finished parse_message - successfully")
-        except (AttributeError,KeyError) as e:
-            self.logger.error(f"Error parsing message - {e}\n Full message - {message}")
-            raise e
-        finally:
-            return result
-
-    @log
-    def validate_message(self, message, cls: Type) -> Any:
-        self.logger.info(f"User {message.chat.username} triggered validate_message for class {cls}")
-        try:
-            parsed_dict = self.parse_message(message)
-        except (AttributeError, KeyError) as e:
-            raise e
-
-        try:
-            validated_model = cls(**parsed_dict)
-            self.logger.info(f"User {message.chat.username} finished validate_message - successfully")
-            return validated_model
-        except ValidationError as e:
-            self.logger.error(f"Error validation message from user {message.chat.username}\n"
-                              f"Message - {parsed_dict}\n"
-                              f"Error - {e}")
-            raise e
-
-    # def _process_something_with_state(self, message, send_additional_error_info: bool = False):
-    #     chat_id = message.chat.id
-    #     username = message.chat.username
-    #     try:
-    #         self.logger.info(f"User {username} triggered process_something_with_state")
-    #         state = self.check_state_and_create(message.chat.username)
-    #         cls, bd_cls, bd_cls_parent = self.CLASS_FROM_STATE[state]
-    #         validated_model_dict = self.validate_message(message, cls).__dict__
-    #
-    #         workspace_record = self.database.get_by_custom_fields(bd_cls_parent,
-    #                                                            owner_name = username,
-    #                                                            name = validated_model_dict["workspace_name"]
-    #                                                            )
-    #         if not workspace_record:
-    #             send_additional_error_info = True
-    #             raise SQLAlchemyError(f"Parent record with Name {validated_model_dict["workspace_name"]} in {bd_cls_parent.__name__} doesn't exist")
-    #         else:
-    #             workspace_record = workspace_record[0].__dict__
-    #             del validated_model_dict["workspace_name"]
-    #             validated_model_dict["workspace_id"] = workspace_record["id"]
-    #
-    #         if validated_model_dict["parent_name"]:
-    #             parent_record = self.database.get_by_custom_fields(bd_cls,
-    #                                                                owner_name = username,
-    #                                                                name = validated_model_dict["parent_name"]
-    #                                                                )
-    #             if not parent_record:
-    #                 send_additional_error_info = True
-    #                 raise SQLAlchemyError(f"Parent record with Name {validated_model_dict["parent_name"]} in {bd_cls.__name__} doesn't exist")
-    #             else:
-    #                 parent_record = parent_record[0].__dict__
-    #                 validated_model_dict["parent_id"] = parent_record["id"]
-    #         del validated_model_dict["parent_name"]
-    #
-    #         validated_model_dict["owner_name"] = username
-    #         self.database.create(bd_cls, validated_model_dict)
-    #         self.logger.info(f"User {message.chat.username} finished process_something_with_state - successfully\n"
-    #                          f"created {cls} with fields {validated_model_dict}\n")
-    #         return self.bot.send_message(chat_id,
-    #                                      f"Successfully created {cls.__name__} named: {validated_model_dict["name"]}.\n"
-    #                                      f"You can use command /view_{cls.__name__} to check your {cls.__name__}\n")
-    #     except SQLAlchemyError as e:
-    #         self.logger.error(
-    #             f"Error upon processing message for {username}. \n"
-    #             f"Error - {str(e)}\n"
-    #             f"Full message - {message}",
-    #             exc_info=True)
-    #         error_text = "There was an error with your request"
-    #         if send_additional_error_info: error_text = error_text + f"\n{str(e)}"
-    #         return self.bot.send_message(chat_id, error_text)
-    #     except (ValidationError, AttributeError, KeyError):
-    #         self.logger.error(f"re raising error")
-    #         return self.bot.send_message(chat_id, "There was an error with your request")
-    #     finally:
-    #         self.clear_state(username)
-
-    # def set_state(self, telegram_username, state):
-    #     self.check_state_and_create(telegram_username)
-    #     self.database.update(BDUserState, telegram_username, {"state": state})
-    #     self.cached_state[telegram_username] = state
-
-    # def check_state_and_create(self, telegram_username):
-    #     try:
-    #         if self.cached_state[telegram_username]:
-    #             return self.cached_state[telegram_username]
-    #     except KeyError:
-    #         self.cached_state[telegram_username] = None
-    #     if not (state := self.database.get_by_id(BDUserState, telegram_username)):
-    #         self.database.create(BDUserState, {"telegram_username": telegram_username, "state": None})
-    #         return None
-    #     else:
-    #         return state
-
-    # def clear_state(self, telegram_username):
-    #     if self.database.get_by_id(BDUserState, telegram_username):
-    #         self.database.delete(BDUserState, telegram_username)
-    #     if self.cached_state[telegram_username]:
-    #         del self.cached_state[telegram_username]
-
-    def log_msg(self, message):
-        self.logger.info(message)
-
-    @log
-    def about(self, message):
-        return self.bot.send_message(message.chat.id,
-                                     "Hello, im Progressor bot, i'll help to keep track of your progress in any field")
-
-    # @log
-    # async def _create_something_handler(self, message):
-    #     username = message.chat.username
-    #     try:
-    #         state = message.text
-    #         self.logger.info(f"User {username} triggered {message.text}")
-    #         self.set_state(username, state)
-    #         await self.bot.send_message(message.chat.id, Statics.MESSAGE_FROM_STATE[state])
-    #     except SQLAlchemyError:
-    #         self.logger.error(
-    #             f"Error upon triggering {message.text} with username - {username}. \n Full message - {message}",
-    #             exc_info=True)
-    #         await self.bot.send_message(message.chat.id, "There was an error with your request")
-
-    @log
-    async def _view_all(self, message):
-        username = message.chat.username
-        # records = self.database.get_by_custom_fields(self.AVAILABLE_CLASSES[split_text[1]],
-        #                                              name=' '.join(split_text[2:]),
-        #                                              owner_name=username, session=session)
-        # keyboard = types.InlineKeyboardMarkup()
-        # for cls in self.AVAILABLE_CLASSES:
-        # # complete_button = types.InlineKeyboardButton(text="Workspace",
-        # #                                              callback_data=f"complete_task:{task_id}")  # Example data
-        # delete_button = types.InlineKeyboardButton(text="Delete", callback_data=f"delete_task:{task_id}")
-        # keyboard.add(complete_button, delete_button)  # Adds the buttons in a row
-        # return keyboard
-
-
-    # async def _view_something(self, message):
-    #     text = message.text
-    #     username = message.chat.username
-    #     self.logger.info(f"User {username} triggered _view_something")
-    #     split_text = text.split()
-    #     if len(split_text) < 3:
-    #         await self.bot.send_message(message.chat.id,
-    #                                      "Please specify what you want to view\n"
-    #                                      "Example: /view Workspace Workspace_Name")
-    #     elif split_text[1] not in self.AVAILABLE_CLASSES.keys():
-    #         await self.bot.send_message(message.chat.id,
-    #                                      "Component not found, please check the spelling"
-    #                                      f"it should be one of {self.AVAILABLE_CLASSES.keys()}")
-    #     else:
-    #         session = self.database.create_session()
-    #         records = self.database.get_by_custom_fields(self.AVAILABLE_CLASSES[split_text[1]],
-    #                                            name=' '.join(split_text[2:]),
-    #                                            owner_name=username,session=session)
-    #         if not records:
-    #             await self.bot.send_message(message.chat.id,
-    #                                          f"Record with name {split_text[2]} in component {split_text[1]} doesn't exist")
-    #         else:
-    #             record = records[0]
-    #             record_progress = self._calculate_progress(record)
-    #             self.database.close_session(session)
-    #             msg = f"{Bot.create_telegram_progress_bar(record_progress)}\n"\
-    #                       f"{record.name}\n"
-    #             if record.description:
-    #                 text_wrap = textwrap.wrap(record.description, width=100)
-    #                 for row in text_wrap:
-    #                     msg += f"{row}\n"
-    #             child_records = record.child_tasks
-    #             for child in child_records:
-    #                 progress_bar = Statics.COMPONENTS_PROGRESS[(child.id,child.__class__)]
-    #                 progress_bar = Bot.create_telegram_progress_bar(progress_bar)
-    #                 msg += f"    {child.name:<{50}} {progress_bar}\n"
-    #             await self.bot.send_message(message.chat.id,msg)
-
-    @log
-    def _calculate_progress(self, record) -> float:
-            cls = record.__class__
-            if (record.id,cls) in Statics.COMPONENTS_PROGRESS.keys():
-                return Statics.COMPONENTS_PROGRESS[(record.id, cls)]
-            else:
-                sum_completed = 0
-                sum_all = 0
-                child_records = record.child_tasks
-                if not child_records and cls == BDTask:
-                    Statics.COMPONENTS_PROGRESS[(record.id,cls)] = record.completed * 100
-                    return record.completed * 100
-                for rec in child_records:
-                    rec_progress = self._calculate_progress(rec) / 100
-                    sum_all += rec.weight
-                    if rec.completed:
-                        sum_completed += rec_progress * rec.weight
-                record_progress = sum_completed / sum_all * 100 if sum_all > 0 else 0
-                Statics.COMPONENTS_PROGRESS[(record.id,cls)] = record_progress
-                return record_progress
-
-    @staticmethod
-    @log
-    def create_progress_bar(progress: float, total_length: int = 10, filled_char: str = "█",
-                            empty_char: str = "░") -> str:
-        """
-        Generates a text-based progress bar.
-
-        Args:
-            progress: A float representing the progress percentage (0.0 to 100.0).
-            total_length: The total length of the progress bar in characters.
-            filled_char: The character to use for the filled portion of the bar.
-            empty_char: The character to use for the empty portion of the bar.
-
-        Returns:
-            A string representing the progress bar.
-        Raises:
-            ValueError: If progress is not a float between 0 and 100.
-        """
-        if not isinstance(progress, (int, float)):
-            raise TypeError("Progress must be a number (int or float)")
-
-        if not 0 <= progress <= 100:
-            raise ValueError("Progress must be between 0 and 100")
-
-        filled_length = int(total_length * progress / 100)
-        bar = filled_char * filled_length + empty_char * (total_length - filled_length)
-        return bar
-
-    @staticmethod
-    @log
-    def create_telegram_progress_bar(progress: float) -> str:
-        """
-        Creates a Telegram-friendly progress bar using Unicode characters.  Includes
-        percentage.
-
-        Args:
-            progress:  A float representing the progress (0.0 - 100.0)
-
-        Returns:
-            A string representing a Telegram-compatible progress bar
-        """
-        bar = Bot.create_progress_bar(progress, total_length=10)  # Adjust length as needed
-        percentage = f"{progress:.1f}%"  # Format percentage with one decimal place
-        return f"[{bar}] {percentage}"  # Combine bar and percentage
+            except Exception as e:
+                await self.exception_handler.handle_error(e = e, chat_id=message.chat.id)
 
     async def start_polling(self):
-        self.log_msg("Starting bot polling...")
+        self.logger.info("Starting bot polling...")
         await self.bot.polling()
 
 

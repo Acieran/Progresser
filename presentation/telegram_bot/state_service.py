@@ -4,6 +4,7 @@ STATES = {"default_short",
           "default_detail",
           "task_name_prompt",
           "task_menu",
+          "task_menu_edit"
           "task_description_prompt",
           "task_priority_prompt",
           "task_due_date_prompt",
@@ -15,34 +16,16 @@ state_transitions = {
     # === Основное меню ===
     "default_short": {
         "/create_task": "task_name_prompt",
-        "/create_sub_task": "task_name_prompt",
-        "/edit_task": "task_menu",
-        "/edit_task <task_id>": {
-            "next_state": "task_menu",
-            "condition": "task_id exists and accessible"
-        },
+        "/edit_task": "task_menu_edit",
         "/delete_task": "delete_task_confirmation_prompt",
-        "/delete_task <task_id>": {
-            "next_state": "delete_task_confirmation_prompt",
-            "condition": "task_id exists and accessible"
-        },
-        "/show_image": "default_short",  # Остаемся в том же состоянии
-        "/enter <task_id>": {
-            "next_state": "default_short",
-            "actions": ["set_current_task(task_id)", "update_breadcrumbs()"]
-        },
-        "/back": {
-            "next_state": "default_short",
-            "condition": "breadcrumbs not empty",
-            "actions": ["move_to_parent_task()"]
-        },
-        "/home": {
-            "next_state": "default_short",
-            "actions": ["reset_to_root()"]
-        },
-        "/detail": "default_detail",
-        "/next": "default_short",  # Пагинация без смены состояния
-        "/previous": "default_short"  # Пагинация без смены состояния
+        "/about": "default_short",
+        # "/show_image": "default_short",
+        # "/enter": "default_detail",
+        # "/back": "default_short",
+        # "/home": "default_short",
+        # "/detail": "default_detail",
+        # "/next": "default_short",
+        # "/previous": "default_short"
     },
 
     # === Меню задачи ===
@@ -51,9 +34,22 @@ state_transitions = {
         "/edit_description": "task_description_prompt",
         "/edit_due_date": "task_due_date_prompt",
         "/edit_priority": "task_priority_prompt",
-        "/edit_all": "task_all_prompt",
+        # "/edit_all": "task_all_prompt",
         "/confirm_creation": "default_short",
-        "/cancel": "default_short"
+        "/cancel": "default_short",
+        "/about": "default_short",
+    },
+
+    # === Меню задачи ===
+    "task_menu_edit": {
+        "/edit_name": "task_name_prompt_edit",
+        "/edit_description": "task_description_prompt_edit",
+        "/edit_due_date": "task_due_date_prompt_edit",
+        "/edit_priority": "task_priority_prompt_edit",
+        # "/edit_all": "task_all_prompt_edit",
+        "/confirm_edit": "default_short",
+        "/cancel_edit": "default_short",
+        "/about": "default_short",
     },
 
     # === Поля ввода ===
@@ -78,24 +74,42 @@ state_transitions = {
         "/cancel": "task_menu"
     },
 
+    "task_name_prompt_edit": {
+        "text_input": "task_menu_edit",
+        "/cancel": "task_menu_edit"
+    },
+    "task_description_prompt_edit": {
+        "text_input": "task_menu_edit",
+        "/cancel": "task_menu_edit"
+    },
+    "task_due_date_prompt_edit": {
+        "text_input": "task_menu_edit",
+        "/cancel": "task_menu_edit"
+    },
+    "task_priority_prompt_edit": {
+        "text_input": "task_menu_edit",
+        "/cancel": "task_menu_edit"
+    },
+    "task_all_prompt_edit": {
+        "text_input": "task_menu_edit",
+        "/cancel": "task_menu_edit"
+    },
+
     # === Удаление задачи ===
     "delete_task_confirmation_prompt": {
-        "/confirm": {
-            "next_state": "default_short",
-            "actions": ["delete_task_and_children()"]
-        },
+        "/confirm_deletion": "default_short",
         "/cancel": "default_short"
     },
 
-    # === Детальный просмотр ===
-    "default_detail": {
-        "/back": "ListSubtasks",
-        "/home": "default_short",
-        "/enter <task_id>": {
-            "next_state": "ListSubtasks",
-            "actions": ["set_current_task(task_id)", "update_breadcrumbs()"]
-        }
-    }
+    # # === Детальный просмотр ===
+    # "default_detail": {
+    #     "/back": "ListSubtasks",
+    #     "/home": "default_short",
+    #     "/enter <task_id>": {
+    #         "next_state": "ListSubtasks",
+    #         "actions": ["set_current_task(task_id)", "update_breadcrumbs()"]
+    #     }
+    # }
 }
 
 @log

@@ -2,10 +2,10 @@ import json
 from functools import wraps
 from typing import Any, Callable, Literal, TypeVar, cast, get_type_hints
 
-from sqlalchemy import exc, select
+from sqlalchemy import exc, select, inspect
 from sqlalchemy import inspect as sqlalchemy_inspect
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, Mapper
 
 from core.application.ports.caching import CachingInterface
 from core.application.ports.repositories import BaseRepositoryInterface
@@ -127,13 +127,14 @@ class BaseRepository(BaseRepositoryInterface, CachingInterface):
 
     @transaction_decorator
     @log
-    def create(self, model: type[Base], **kwargs: Any) -> Literal[True]:
+    def create(self, model: type[Base], **kwargs: Any) -> str | int | None:
         """Creates a new record in the database."""
         try:
             instance = model(**kwargs)
             self._ensure_session().add(instance)
+            self._ensure_session().flush()
             self._invalidate_cache(model.__name__.lower(), "get_all", "get_by_custom_fields")
-            return True
+            return self.get_primary_key_value(instance)
         except exc.SQLAlchemyError as e:
             raise e
 
@@ -207,13 +208,21 @@ class BaseRepository(BaseRepositoryInterface, CachingInterface):
     @cache
     @transaction_decorator
     @log
-    def get_by_custom_fields(self, model: type[Base], **kwargs: Any) -> list[dict[str, Any]]:
+    def get_by_custom_fields(
+            self,
+            model: type[Base],
+            offset: int = 0,
+            limit: int = 10,
+            **kwargs: Any
+    ) -> list[dict[str, Any]]:
         """
         Retrieves records from the database based on multiple custom fields
         specified as keyword arguments.
 
         Args:
             model: The SQLAlchemy model class to query.
+            offset: The offset to start with.
+            limit: The number of records to return.
             **kwargs: Keyword arguments representing name = value to search for.
                        For example: `username="testuser", email="test@example.com"`
 
@@ -227,8 +236,14 @@ class BaseRepository(BaseRepositoryInterface, CachingInterface):
             for field, value in kwargs.items():
                 column = getattr(model, field, None)  # Get the column object from the model
                 if column is None:
-                    raise SQLAlchemyError(f"Model '{model.__name__}' has no attribute '{field}'")
+                    raise SQLAlchemyError(f"Model '{str(model)}' has no attribute '{field}'")
                 query = query.where(inspector.columns[field] == value)
+
+            # Apply offset and limit
+            if offset > 0:
+                query = query.offset(offset)
+            if limit is not None:
+                query = query.limit(limit)
 
             # Execute the query and return the results
             result = self._ensure_session().execute(query).scalars().all()
@@ -291,3 +306,31 @@ class BaseRepository(BaseRepositoryInterface, CachingInterface):
             return [x.to_dict() for x in result if isinstance(x,Base)]
         except exc.SQLAlchemyError as e:
             raise e
+
+    @staticmethod
+    @log
+    def get_primary_key_value(instance) -> str | int | None :
+        """
+        Get primary key value(s) of a SQLAlchemy model instance.
+        Returns a single value for single-column PKs, or a tuple for composite PKs.
+        Returns None if the instance is transient (not persisted).
+        """
+        # Get the instance state
+        state = inspect(instance)
+
+        # If identity exists (instance is persistent), use it directly
+        if state.identity is not None:
+            return state.identity[0] if len(state.identity) == 1 else state.identity
+
+        # For transient instances, manually fetch PK values
+        mapper: Mapper = state.mapper
+        pk_attrs = [prop.key for prop in mapper.primary_key]
+
+        if not pk_attrs:
+            return None  # No primary key defined
+
+        # Get values from instance attributes
+        pk_values = [getattr(instance, attr) for attr in pk_attrs]
+
+        # Return single value for single-column PK, tuple for composite PK
+        return pk_values[0] if len(pk_values) == 1 else tuple(pk_values)

@@ -10,7 +10,7 @@ from shared.logging_decorator import log
 # class UserRepository(BaseRepository):
 #     @BaseRepository.transaction_decorator
 #     @log
-#     def create(self, username: str) -> Literal[True]:
+#     def create(shared_manager, username: str) -> Literal[True]:
 #         """Creates a new record in the database."""
 #         try:
 #             super().create(User, username=username, telegram_username=username)

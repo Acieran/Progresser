@@ -23,8 +23,8 @@ class Base(DeclarativeBase):
 #     owner_name: Mapped[str] = mapped_column(ForeignKey("users.username"))
 #     owner: Mapped["User"] = relationship(back_populates="workspace")
 #     child_tasks: Mapped[List["Task"]] = relationship("Task", back_populates="workspace", cascade="all, delete-orphan")
-#     def __repr__(self) -> str:
-#         return f"Item(Name={self.name!r}, Owner={self.owner_name!r}, Description={self.description!r})"
+#     def __repr__(shared_manager) -> str:
+#         return f"Item(Name={shared_manager.name!r}, Owner={shared_manager.owner_name!r}, Description={shared_manager.description!r})"
 
 class User(Base):
     __tablename__ = "users"
@@ -38,16 +38,16 @@ class User(Base):
     # user_state: Mapped[List["UserState"]] = relationship(
     #     back_populates="user", cascade="all, delete-orphan", lazy="select"
     # )
-    # def __repr__(self) -> str:
-    #     return f"Username(id={self.username!r}, Active={self.active!r}, Chat_id={self.telegram_username!r})"
+    # def __repr__(shared_manager) -> str:
+    #     return f"Username(id={shared_manager.username!r}, Active={shared_manager.active!r}, Chat_id={shared_manager.telegram_username!r})"
 
 # class UserState(Base):
 #     __tablename__ = "user_state"
 #     telegram_username: Mapped[str] = mapped_column(ForeignKey("users.telegram_username"), primary_key=True)
 #     state: Mapped[Optional[str]] = mapped_column(String(50), default=None, nullable=True)
 #     user: Mapped["User"] = relationship(User, back_populates="user_state")
-#     def __repr__(self) -> str:
-#         return f"UserState(id={self.telegram_username!r}, State={self.state!r})"
+#     def __repr__(shared_manager) -> str:
+#         return f"UserState(id={shared_manager.telegram_username!r}, State={shared_manager.state!r})"
 
 class Task(Base):
     __tablename__ = "tasks"
@@ -56,7 +56,7 @@ class Task(Base):
     # workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"))
     # workspace: Mapped["Workspace"] = relationship(back_populates="child_tasks")
 
-    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tasks.id"), nullable=True)
+    parent_task_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tasks.id"), nullable=True)
     parent_task: Mapped[Optional["Task"]] = relationship(
         "Task", back_populates="child_tasks", remote_side=id
     )
