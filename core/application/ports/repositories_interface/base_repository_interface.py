@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Literal
+from typing import Any
 
 
 class BaseRepositoryInterface(ABC):
@@ -23,4 +23,3 @@ class BaseRepositoryInterface(ABC):
 
     @abstractmethod
     def get_all(self, model: type) -> list[dict[str, Any]]: ...
-    

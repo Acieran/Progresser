@@ -8,13 +8,11 @@ from infrastructure.database_access_managers.sqlalchemy.models import User as BD
 from infrastructure.error_handler.errors import WrongTransitionError, InternalCreationError, BusinessCreationError
 from presentation.telegram_bot.responses.keyboard_markup_manager import reply_markup_dict
 from presentation.telegram_bot.responses.telegram_response_manager import automatic_response_generation
-from presentation.telegram_bot import state_service
 from shared.logging_decorator import log
 
 
 class TelegramTaskManagement:
     def __init__(self, state_man: state_manager.StateManager, bd_repo: BaseRepository):
-        self.task: EntityTask = EntityTask("", "")
         self.state_manager = state_man
         self.bd_repository = bd_repo
         self.type_dict = {

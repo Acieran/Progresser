@@ -1,5 +1,5 @@
 from core.application.ports.caching import CacheInterface
-from core.application.ports.repositories import BaseRepositoryInterface
+from core.application.ports.repositories_interface import BaseRepositoryInterface
 from core.application.shared.use_cases.use_case_base_class import UseCase
 from core.domain.entities import Entities
 

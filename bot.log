@@ -1,0 +1,37 @@
+2025-06-28 19:53:35,463 - shared.logging_decorator - INFO - Call: transaction_decorator with args=['func = function()'] kwargs={}
+2025-06-28 19:53:35,464 - shared.logging_decorator - INFO - Done: transaction_decorator result=<function BaseRepository.create at 0x00000134E31BB560>
+2025-06-28 19:53:35,464 - shared.logging_decorator - INFO - Call: transaction_decorator with args=['func = function()'] kwargs={}
+2025-06-28 19:53:35,464 - shared.logging_decorator - INFO - Done: transaction_decorator result=<function BaseRepository.get_by_id at 0x00000134E31BB9C0>
+2025-06-28 19:53:35,464 - shared.logging_decorator - INFO - Call: cache with args=['func = function()'] kwargs={}
+2025-06-28 19:53:35,464 - shared.logging_decorator - INFO - Done: cache result=<function BaseRepository.get_by_id at 0x00000134E31BBA60>
+2025-06-28 19:53:35,464 - shared.logging_decorator - INFO - Call: transaction_decorator with args=['func = function()'] kwargs={}
+2025-06-28 19:53:35,464 - shared.logging_decorator - INFO - Done: transaction_decorator result=<function BaseRepository.get_by_custom_field at 0x00000134E31BBC40>
+2025-06-28 19:53:35,464 - shared.logging_decorator - INFO - Call: cache with args=['func = function()'] kwargs={}
+2025-06-28 19:53:35,464 - shared.logging_decorator - INFO - Done: cache result=<function BaseRepository.get_by_custom_field at 0x00000134E31BBCE0>
+2025-06-28 19:53:35,464 - shared.logging_decorator - INFO - Call: transaction_decorator with args=['func = function()'] kwargs={}
+2025-06-28 19:53:35,464 - shared.logging_decorator - INFO - Done: transaction_decorator result=<function BaseRepository.get_by_custom_fields at 0x00000134E31BBF60>
+2025-06-28 19:53:35,465 - shared.logging_decorator - INFO - Call: cache with args=['func = function()'] kwargs={}
+2025-06-28 19:53:35,465 - shared.logging_decorator - INFO - Done: cache result=<function BaseRepository.get_by_custom_fields at 0x00000134E31C80E0>
+2025-06-28 19:53:35,465 - shared.logging_decorator - INFO - Call: transaction_decorator with args=['func = function()'] kwargs={}
+2025-06-28 19:53:35,465 - shared.logging_decorator - INFO - Done: transaction_decorator result=<function BaseRepository.update at 0x00000134E31C82C0>
+2025-06-28 19:53:35,465 - shared.logging_decorator - INFO - Call: transaction_decorator with args=['func = function()'] kwargs={}
+2025-06-28 19:53:35,465 - shared.logging_decorator - INFO - Done: transaction_decorator result=<function BaseRepository.delete at 0x00000134E31C84A0>
+2025-06-28 19:53:35,465 - shared.logging_decorator - INFO - Call: transaction_decorator with args=['func = function()'] kwargs={}
+2025-06-28 19:53:35,465 - shared.logging_decorator - INFO - Done: transaction_decorator result=<function BaseRepository.get_all at 0x00000134E31C87C0>
+2025-06-28 19:53:35,465 - shared.logging_decorator - INFO - Call: cache with args=['func = function()'] kwargs={}
+2025-06-28 19:53:35,465 - shared.logging_decorator - INFO - Done: cache result=<function BaseRepository.get_all at 0x00000134E31C8860>
+2025-06-28 19:53:35,483 - shared.logging_decorator - INFO - Call: get_connection with args=['self = CachingDatabaseManager()'] kwargs={}
+2025-06-28 19:53:35,483 - shared.logging_decorator - INFO - Done: get_connection result=<redis.client.Redis(<redis.connection.ConnectionPool(<redis.connection.Connection(host=localhost,port=6379,db=0)>)>)>
+2025-06-28 19:53:35,515 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2025-06-28 19:53:35,516 - sqlalchemy.engine.Engine - INFO - PRAGMA main.table_info("users")
+2025-06-28 19:53:35,516 - sqlalchemy.engine.Engine - INFO - [raw sql] ()
+2025-06-28 19:53:35,517 - sqlalchemy.engine.Engine - INFO - PRAGMA main.table_info("tasks")
+2025-06-28 19:53:35,517 - sqlalchemy.engine.Engine - INFO - [raw sql] ()
+2025-06-28 19:53:35,517 - sqlalchemy.engine.Engine - INFO - COMMIT
+2025-06-28 19:53:35,517 - shared.logging_decorator - INFO - Call: register_handlers with args=['self = Bot(bot=AsyncTeleBot(token="7936881677:AAF0p2aNy5OfyymkCj_Z-qWYPPqSxzZCeHM", offset=None, parse_mode=None, disable_web_page_preview=None, disable_notification=None, protect_content=None, allow_sending_without_reply=None, current_states=StateMemoryStorage(separator=..., prefix=..., data=...), update_listener=[], exception_handler=CustomErrorHandler(bot=...), message_handlers=[], edited_message_handlers=[], channel_post_handlers=[], edited_channel_post_handlers=[], message_reaction_handlers=[], message_reaction_count_handlers=[], inline_handlers=[], chosen_inline_handlers=[], callback_query_handlers=[], shipping_query_handlers=[], pre_checkout_query_handlers=[], poll_handlers=[], poll_answer_handlers=[], my_chat_member_handlers=[], chat_member_handlers=[], chat_join_request_handlers=[], removed_chat_boost_handlers=[], chat_boost_handlers=[], business_connection_handlers=[], business_message_handlers=[], edited_business_message_handlers=[], deleted_business_messages_handlers=[], purchased_paid_media_handlers=[], custom_filters={}, state_handlers=[], middlewares=[], bot_id=7936881677, error_handler=CustomErrorHandler(bot=...)), exception_handler=CustomErrorHandler(bot=AsyncTeleBot(token=..., offset=..., parse_mode=..., disable_web_page_preview=..., disable_notification=..., protect_content=..., allow_sending_without_reply=..., current_states=..., update_listener=..., exception_handler=..., message_handlers=..., edited_message_handlers=..., channel_post_handlers=..., edited_channel_post_handlers=..., message_reaction_handlers=..., message_reaction_count_handlers=..., inline_handlers=..., chosen_inline_handlers=..., callback_query_handlers=..., shipping_query_handlers=..., pre_checkout_query_handlers=..., poll_handlers=..., poll_answer_handlers=..., my_chat_member_handlers=..., chat_member_handlers=..., chat_join_request_handlers=..., removed_chat_boost_handlers=..., chat_boost_handlers=..., business_connection_handlers=..., business_message_handlers=..., edited_business_message_handlers=..., deleted_business_messages_handlers=..., purchased_paid_media_handlers=..., custom_filters=..., state_handlers=..., middlewares=..., bot_id=..., error_handler=...)), cached_state={}, logger=Logger(filters=[], name="__main__", level=0, parent=RootLogger(filters=..., name=..., level=..., parent=..., propagate=..., handlers=..., disabled=...), propagate=True, handlers=[], disabled=False, manager=Manager(root=..., emittedNoHandlerWarning=..., loggerDict=..., loggerClass=..., logRecordFactory=...)), database=BaseRepository(db_manager=SQLDatabaseManager(engine=..., SessionLocal=...), redis_db_manager=CachingDatabaseManager()), handlers=[])'] kwargs={}
+2025-06-28 19:53:35,518 - shared.logging_decorator - INFO - Done: register_handlers result=None
+2025-06-28 19:53:35,518 - shared.logging_decorator - INFO - Call: get_connection with args=['self = CachingDatabaseManager()'] kwargs={}
+2025-06-28 19:53:35,518 - shared.logging_decorator - INFO - Done: get_connection result=<redis.client.Redis(<redis.connection.ConnectionPool(<redis.connection.Connection(host=localhost,port=6379,db=0)>)>)>
+2025-06-28 19:53:35,518 - shared.logging_decorator - INFO - Call: get_connection with args=['self = CachingDatabaseManager()'] kwargs={}
+2025-06-28 19:53:35,518 - shared.logging_decorator - INFO - Done: get_connection result=<redis.client.Redis(<redis.connection.ConnectionPool(<redis.connection.Connection(host=localhost,port=6379,db=0)>)>)>
+2025-06-28 19:53:35,518 - __main__ - INFO - Starting bot polling...

@@ -20,7 +20,6 @@ from presentation.telegram_bot.error_handler import CustomErrorHandler
 from presentation.telegram_bot.deeplink_start_parser import parse_deep_link
 from presentation.telegram_bot.telegram_task_management import TelegramTaskManagement
 from shared.logging_decorator import log
-import resources
 
 
 class Bot:

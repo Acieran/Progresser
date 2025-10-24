@@ -1,5 +1,5 @@
 from core.application.ports.caching import CacheInterface
-from core.application.ports.repositories import BaseRepositoryInterface
+from core.application.ports.repositories_interface import BaseRepositoryInterface
 from core.application.shared.shared_manager import SharedManager
 from core.application.users.use_cases.get_user_use_case import get_user_use_case
 from core.application.users.use_cases.get_user_or_create_use_case import get_user_or_create_use_case

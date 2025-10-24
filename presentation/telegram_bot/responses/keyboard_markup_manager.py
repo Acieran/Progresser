@@ -1,7 +1,5 @@
 from telebot import types
 
-from presentation.telegram_bot import state_service
-
 reply_markup_dict: dict[str: ...] = {
     "keyboard": types.ReplyKeyboardMarkup(resize_keyboard=True),
     "task_name_prompt": None,

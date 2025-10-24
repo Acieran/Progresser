@@ -8,7 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, Mapper
 
 from core.application.ports.caching import CachingInterface
-from core.application.ports.repositories import BaseRepositoryInterface
+from core.application.ports.repositories_interface import BaseRepositoryInterface
 from infrastructure.database_access_managers.redis.caching_database_manager import CachingDatabaseManager
 from infrastructure.database_access_managers.sqlalchemy.models import Base
 from infrastructure.database_access_managers.sqlalchemy.sql_database_manager import SQLDatabaseManager

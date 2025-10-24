@@ -1,5 +1,5 @@
 from core.application.ports.caching import CacheInterface
-from core.application.ports.repositories import BaseRepositoryInterface
+from core.application.ports.repositories_interface import BaseRepositoryInterface
 from core.application.shared.shared_manager import SharedManager
 from core.application.tasks.use_cases.delete_task_use_case import delete_task_use_case
 from core.application.tasks.use_cases.calculate_progress import calculate_progress

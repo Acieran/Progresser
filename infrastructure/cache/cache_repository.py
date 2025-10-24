@@ -1,5 +1,3 @@
-import json
-
 from core.application.ports.caching import CacheInterface
 from core.application.ports.database import CacheDBConnectionInterface
 from infrastructure.error_handler.errors import InternalRedisError
@@ -11,7 +9,35 @@ sec_from_hour = 60 * 60
 class CacheRepository(CacheInterface):
     def __init__(self, redis_db_manager: CacheDBConnectionInterface):
         self.redis_conn = redis_db_manager.get_connection()
-        self.user_key_base = "user_cache:"
+        self.user_key_base = "user_cache"
+
+    @log
+    def set_hash(self, user_id: str, value_dict: dict, key: str) -> bool:
+        try:
+            self.redis_conn.hset(key, mapping=value_dict)
+            return True
+        except Exception as e:
+            raise InternalRedisError(str(e), user_id)
+
+    @log
+    def get_hash(self, user_id: str, key: str) -> dict:
+        try:
+            result = None
+            if self.redis_conn.exists(key):
+                 result = self.redis_conn.hgetall(key)
+            if isinstance(result, bytes):
+                result = result.decode("utf-8")
+            return result
+        except Exception as e:
+            raise InternalRedisError(str(e), user_id)
+
+    @log
+    def clear_hash(self, user_id: str, key: str) -> bool:
+        try:
+            self.redis_conn.hdel(key)
+            return True
+        except Exception as e:
+            raise InternalRedisError(str(e), user_id)
 
     @log
     def get_user_cache_all(self, telegram_username: str) -> dict:
@@ -39,32 +65,6 @@ class CacheRepository(CacheInterface):
         try:
             key = self.user_key_base + telegram_username
             self.redis_conn.hset(key, cache_name, cache_value)
-            return True
-        except Exception as e:
-            raise InternalRedisError(str(e), telegram_username)
-
-    @log
-    def get_user_task_fields_cache(self, telegram_username: str) -> dict:
-        try:
-            key = self.user_key_base + telegram_username + ":task"
-            return self.redis_conn.hgetall(key)
-        except Exception as e:
-            raise InternalRedisError(str(e), telegram_username)
-
-    @log
-    def set_user_task_fields_cache(self, telegram_username: str, cache_dict: dict) -> bool:
-        try:
-            key = self.user_key_base + telegram_username + ":task"
-            self.redis_conn.hset(key, mapping=cache_dict)
-            return True
-        except Exception as e:
-            raise InternalRedisError(str(e), telegram_username)
-
-    @log
-    def clear_user_task_fields_cache(self, telegram_username: str) -> bool:
-        try:
-            key = self.user_key_base + telegram_username + ":task"
-            self.redis_conn.hdel(key)
             return True
         except Exception as e:
             raise InternalRedisError(str(e), telegram_username)

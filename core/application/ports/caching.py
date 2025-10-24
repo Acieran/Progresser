@@ -46,11 +46,5 @@ class CacheInterface(ABC):
     @abstractmethod
     def drop_task_progress_cache(self, task_id: int) -> bool: ...
 
-    @abstractmethod
-    def clear_user_task_fields_cache(self, telegram_username: str) -> bool: ...
-
-    @abstractmethod
-    def set_user_task_fields_cache(self, telegram_username: str, cache_dict: dict) -> bool: ...
-
 
 
